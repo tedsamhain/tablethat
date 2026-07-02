@@ -1,6 +1,6 @@
-use crate::config::{self, ColorsConfig, Config};
 use serde::Deserialize;
 use std::path::PathBuf;
+use tablethat_lib::{self as lib, ColorsConfig, Config};
 
 #[derive(Deserialize, Debug)]
 pub struct Task {
@@ -18,19 +18,27 @@ pub struct LoadedTask {
 }
 
 pub fn validate_all(root: &std::path::Path) -> bool {
-    let tasks_dir = root.join(".tasks");
-    let schema_path = tasks_dir.join(".schema.json");
+    let tasks_dir = root.join(".plan");
+
+    let schema_path = match lib::resolve_file(root, ".plan", ".schema.json", "schema.json", "plan")
+    {
+        Some(p) => p,
+        None => {
+            eprintln!("error: no schema found (searched .plan/.schema.json, config dir, data dir)");
+            return false;
+        }
+    };
 
     let schema: serde_json::Value = match std::fs::read_to_string(&schema_path) {
         Ok(s) => match serde_json::from_str(&s) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!(".tasks/.schema.json: invalid JSON — {e}");
+                eprintln!("{}: invalid JSON — {e}", schema_path.display());
                 return false;
             }
         },
         Err(e) => {
-            eprintln!(".tasks/.schema.json: cannot read — {e}");
+            eprintln!("{}: cannot read — {e}", schema_path.display());
             return false;
         }
     };
@@ -173,7 +181,7 @@ pub fn list_tasks(
 ) {
     let _ = validate_all(root);
 
-    let tasks_dir = root.join(".tasks");
+    let tasks_dir = root.join(".plan");
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,
@@ -375,7 +383,7 @@ fn status_color(status: &str, colors: &ColorsConfig) -> Color {
         "done" => &colors.status.done,
         _ => return Color::White,
     };
-    config::parse_color(s)
+    lib::parse_color(s)
 }
 
 fn priority_color(p: &str, colors: &ColorsConfig) -> Color {
@@ -385,7 +393,7 @@ fn priority_color(p: &str, colors: &ColorsConfig) -> Color {
         "low" => &colors.priority.low,
         _ => return Color::White,
     };
-    config::parse_color(s)
+    lib::parse_color(s)
 }
 
 fn status_label(status: &str) -> &str {
@@ -609,18 +617,44 @@ fn parse_frontmatter(content: &str) -> Result<(String, usize), String> {
     Ok((frontmatter.join("\n"), first_line + 1))
 }
 
-pub fn workspace_root() -> PathBuf {
-    let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    // Walk up from cwd to find a .tasks/ directory
-    let mut candidate = Some(dir.as_path());
-    while let Some(path) = candidate {
-        if path.join(".tasks").is_dir() {
-            return path.to_path_buf();
-        }
-        candidate = path.parent();
+pub fn init_plan(root: &std::path::Path) {
+    let plan_dir = root.join(".plan");
+    if plan_dir.exists() {
+        eprintln!(".plan/ already exists at {}", root.display());
+        return;
     }
-    // Fallback: cwd
-    dir
+
+    std::fs::create_dir_all(&plan_dir).expect("failed to create .plan/");
+
+    // Copy schema from config/data dir if available
+    if let Some(schema_src) =
+        lib::resolve_file(root, ".plan", ".schema.json", "schema.json", "plan")
+    {
+        let dest = plan_dir.join(".schema.json");
+        std::fs::copy(&schema_src, &dest).expect("failed to copy schema");
+        eprintln!("created {}", dest.display());
+    } else {
+        // Write default schema
+        let schema = include_str!("../../.plan/.schema.json");
+        let dest = plan_dir.join(".schema.json");
+        std::fs::write(&dest, schema).expect("failed to write schema");
+        eprintln!("created {}", dest.display());
+    }
+
+    // Copy template from config/data dir if available
+    if let Some(tmpl_src) = lib::resolve_file(root, ".plan", ".TEMPLATE.md", "TEMPLATE.md", "plan")
+    {
+        let dest = plan_dir.join(".TEMPLATE.md");
+        std::fs::copy(&tmpl_src, &dest).expect("failed to copy template");
+        eprintln!("created {}", dest.display());
+    } else {
+        let tmpl = include_str!("../../.plan/.TEMPLATE.md");
+        let dest = plan_dir.join(".TEMPLATE.md");
+        std::fs::write(&dest, tmpl).expect("failed to write template");
+        eprintln!("created {}", dest.display());
+    }
+
+    eprintln!("initialized .plan/ in {}", root.display());
 }
 
 /// Re-emit a task file with canonical frontmatter field ordering and clean formatting.
@@ -712,7 +746,7 @@ fn value_to_yaml_str(val: &serde_yaml::Value) -> String {
 }
 
 pub fn normalize_all(root: &std::path::Path) -> bool {
-    let tasks_dir = root.join(".tasks");
+    let tasks_dir = root.join(".plan");
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,

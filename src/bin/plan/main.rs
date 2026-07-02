@@ -1,16 +1,18 @@
-mod config;
-mod tasks;
-mod tui;
-
 use clap::Parser;
 use std::path::PathBuf;
+use tablethat_lib as lib;
+
+#[path = "../../plan/tasks.rs"]
+mod tasks;
+#[path = "../../plan/tui_kanban.rs"]
+mod tui_kanban;
 
 #[derive(Parser)]
 #[command(
-    name = "tablethat",
+    name = "plan",
     version,
     max_term_width = 80,
-    about = "Markdown-native task tracker with kanban TUI — table that thought and come back to it later"
+    about = "Task management with kanban TUI — plan your work, table that thought"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -59,6 +61,10 @@ struct Cli {
     /// Normalize frontmatter + body, then exit
     #[arg(long)]
     format: bool,
+
+    /// Initialize a .plan/ directory with default schema and template
+    #[arg(long)]
+    init: bool,
 }
 
 #[derive(Parser)]
@@ -90,18 +96,20 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    // Load layered config: defaults < file < env < CLI
-    let mut cfg = config::Config::load(cli.config.as_deref());
+    let mut cfg = lib::Config::load("plan", "PLAN_", cli.config.as_deref());
 
-    // CLI --root overrides config root
     if cli.root.is_some() {
         cfg.root = cli.root;
     }
 
-    // Resolve root: config/CLI > auto-detect
-    let root = cfg.root.clone().unwrap_or_else(tasks::workspace_root);
+    let root = cfg.root.clone().unwrap_or_else(lib::workspace_root);
 
-    // Resolve filter values — prefer subcommand flags, fall back to top-level
+    // --init: scaffold .plan/ directory
+    if cli.init {
+        tasks::init_plan(&root);
+        return;
+    }
+
     let (status_filter, type_filter, priority_filter, area_filter, search_query) =
         match &cli.command {
             Some(Commands::Tui {
@@ -128,7 +136,7 @@ fn main() {
 
     match cli.command {
         Some(Commands::Tui { .. }) => {
-            tui::run_tui(
+            tui_kanban::run_tui(
                 &root,
                 &cfg,
                 status_filter,

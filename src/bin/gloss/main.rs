@@ -1,0 +1,91 @@
+use clap::Parser;
+use std::path::PathBuf;
+use tablethat_lib as lib;
+
+#[path = "../../gloss/filter.rs"]
+mod filter;
+#[path = "../../gloss/tui_preview.rs"]
+mod tui_preview;
+
+#[derive(Parser)]
+#[command(
+    name = "gloss",
+    version,
+    max_term_width = 80,
+    about = "Markdown viewer — filter mode for vim/pagers, TUI for browsing"
+)]
+struct Cli {
+    /// File or directory to view (TUI mode). If omitted, reads stdin (filter mode).
+    #[arg(value_name = "PATH")]
+    path: Option<PathBuf>,
+
+    /// Path to config file (default: auto-detect)
+    #[arg(long, global = true, value_name = "PATH")]
+    config: Option<PathBuf>,
+
+    /// Disable colored output in filter mode
+    #[arg(long)]
+    no_color: bool,
+
+    /// Theme name to use (overrides default)
+    #[arg(long, value_name = "NAME")]
+    theme: Option<String>,
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    let cfg = lib::Config::load("gloss", "GLOSS_", cli.config.as_deref());
+    let themes = lib::theme::load_themes(cfg.themes_dir.as_deref(), "gloss");
+
+    // Select theme
+    let theme = if let Some(ref name) = cli.theme {
+        themes
+            .iter()
+            .find(|t| t.name == *name)
+            .unwrap_or(&themes[0])
+            .clone()
+    } else {
+        themes[0].clone()
+    };
+
+    let is_tty = is_tty();
+
+    match cli.path {
+        // TUI mode: file or directory argument provided, or no arg but tty
+        Some(path) if path.is_file() => {
+            tui_preview::run_file_viewer(&path, &cfg, &themes, 0);
+        }
+        Some(path) if path.is_dir() => {
+            tui_preview::run_directory_browser(&path, &cfg, &themes);
+        }
+        Some(path) => {
+            eprintln!("gloss: {}: not a file or directory", path.display());
+            std::process::exit(1);
+        }
+        // Filter mode: stdin piped
+        None if !is_tty => {
+            filter::run_filter(&theme, cli.no_color);
+        }
+        // No arg + tty: browse .md files in cwd
+        None => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            tui_preview::run_directory_browser(&cwd, &cfg, &themes);
+        }
+    }
+}
+
+#[cfg(unix)]
+fn is_tty() -> bool {
+    unsafe {
+        unsafe extern "C" {
+            fn isatty(fd: i32) -> i32;
+        }
+        isatty(0) != 0
+    }
+}
+
+#[cfg(not(unix))]
+fn is_tty() -> bool {
+    true
+}

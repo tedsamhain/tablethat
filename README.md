@@ -1,10 +1,31 @@
 # tablethat
 
-Markdown-native task tracker with a kanban TUI.
+**plan** + **gloss** — task management and markdown viewing.
 
-**Table that.** You're deep in task X. The AI agent finds something — a memory leak, a design smell, an interesting pattern. It's worth tracking, but not right now. `tablethat` captures it as a deferred task and gets out of your way.
+## Two tools
 
-Tasks live in `.tasks/*.md` as markdown files with YAML frontmatter. The filesystem is the database, git is the audit trail.
+### plan
+
+Task management with kanban TUI. Tasks live in `.plan/*.md` as markdown files with YAML frontmatter.
+
+```
+plan                    # list tasks
+plan -k                 # kanban view
+plan tui                # interactive TUI
+plan --lint             # validate frontmatter
+plan --init             # scaffold .plan/ directory
+```
+
+### gloss
+
+Markdown viewer — filter mode for vim/pagers, TUI for browsing.
+
+```
+gloss README.md         # TUI single file viewer
+gloss docs/             # TUI directory browser
+cat file.md | gloss     # filter mode (stdin → stdout)
+:%!gloss                # vim filter
+```
 
 ## Install
 
@@ -12,32 +33,9 @@ Tasks live in `.tasks/*.md` as markdown files with YAML frontmatter. The filesys
 cargo install --path .
 ```
 
-## Quick start
-
-```bash
-# List all tasks
-tablethat
-
-# Kanban view grouped by status
-tablethat -k
-
-# Filter
-tablethat -s open -t bug
-tablethat -q "auth"
-
-# Interactive TUI
-tablethat tui
-
-# Validate task frontmatter
-tablethat --lint
-
-# Normalize task files (canonical field ordering)
-tablethat --format
-```
-
 ## Task format
 
-Each task is a markdown file in `.tasks/`:
+Each task is a markdown file in `.plan/`:
 
 ```markdown
 ---
@@ -49,118 +47,56 @@ area: backend
 
 ## Notes
 
-Description and context. Agents append progress notes below.
+Description and context.
 ```
 
 **Status:** `idea` · `backlog` · `open` · `in-progress` · `blocked` · `done`
 **Type:** `bug` · `feature` · `chore` · `decision` · `perf`
 **Priority:** `high` · `medium` · `low`
 
-Validation is driven by `.tasks/.schema.json` — edit it to add fields or constrain values.
+Validation uses `.plan/.schema.json` (project-local), or falls back to `~/.config/plan/schema.json`.
 
-## TUI
+## Configuration
 
-```
-tablethat tui
-```
+Both tools use layered configuration: **defaults < config file < env vars < CLI flags**.
 
-Interactive kanban browser with keyboard navigation:
+### plan
 
-| Key              | Action                    |
-| ---------------- | ------------------------- |
-| `↑`/`↓` `k`/`j` | Navigate tasks            |
-| `←`/`→` `h`/`l` | Move between fields       |
-| `Enter`          | Preview task (markdown)   |
-| `f`              | Filter by selected field  |
-| `e`              | Open task in `$EDITOR`    |
-| `c`              | Cycle preview theme       |
-| `q`              | Clear filters / quit      |
-| `Ctrl-c`         | Quit                      |
+| Source | Path |
+|---|---|
+| Config file | `plan.toml` (project) / `~/.config/plan/config.toml` (user) |
+| Env prefix | `PLAN_` |
+| Env vars | `PLAN_ROOT`, `PLAN_EDITOR`, `PLAN_CONFIG`, `PLAN_THEMES_DIR` |
+
+### gloss
+
+| Source | Path |
+|---|---|
+| Config file | `gloss.toml` (project) / `~/.config/gloss/config.toml` (user) |
+| Env prefix | `GLOSS_` |
+| Env vars | `GLOSS_CONFIG`, `GLOSS_THEMES_DIR` |
 
 ### Themes
 
-Preview themes are TOML files discovered from:
-
-1. `themes/` directory in the project root
-2. `~/.config/tablethat/themes/` (platform config dir)
-
-Cycle through themes with `c` in preview mode. Create custom themes by copying `themes/default.toml` and editing colors:
+Theme TOML files in `themes/` directory. Cycle with `c` in preview mode.
 
 ```toml
 name = "my-theme"
 
 [theme]
 h1_color = "green"
-h2_color = "cyan"
-h3_color = "cyan"
 code_color = "magenta"
-bold_style = "bold"
-emphasis_style = "underlined"
 ```
 
-Override the themes directory in config: `themes_dir = "/path/to/my/themes"`.
+Color values: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `darkgray`, `white`, or ANSI256 decimal.
 
 ## Integration with AI agents
 
-`tablethat` works naturally with AI coding agents. The `.tasks/` directory convention gives agents a structured way to record discoveries:
+`plan` works naturally with AI coding agents. The `.plan/` directory convention gives agents a structured way to record discoveries:
 
 1. Agent encounters something tangential during a task
-2. Agent creates a task file in `.tasks/`
-3. Human reviews with `tablethat -k` or `tablethat tui`
-
-The schema is human-readable markdown. No APIs, no databases, no coordination servers.
-
-## Configuration
-
-`tablethat` uses layered configuration: **defaults < config file < env vars < CLI flags**.
-
-### Config file search paths
-
-Checked in order (first found wins):
-
-1. `--config <path>` (explicit CLI flag)
-2. `$T2_CONFIG` env var
-3. `./tablethat.toml` (project-local)
-4. `~/.config/tablethat/config.toml` (Linux) / platform equivalent
-
-### Environment variables
-
-Prefix: `T2_`
-
-| Variable | Equivalent |
-|---|---|
-| `T2_ROOT` | `--root` |
-| `T2_EDITOR` | Editor fallback (overrides `$EDITOR`) |
-| `T2_CONFIG` | Config file path |
-| `T2_THEMES_DIR` | Themes directory path |
-
-### Config keys
-
-All keys are optional. See `tablethat.example.toml` for a full reference.
-
-```toml
-root = "/path/to/project"
-editor = "hx"
-themes_dir = "/path/to/themes"
-default_sort = ["priority", "area", "slug"]
-kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
-
-[theme]
-h1_color = "green"
-code_color = "magenta"
-
-[colors.status]
-in_progress = "magenta"
-open = "yellow"
-blocked = "red"
-
-[colors.priority]
-high = "red"
-medium = "yellow"
-low = "darkgray"
-```
-
-Color values: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `darkgray`, `white`, or an ANSI256 decimal (e.g. `"8"`).
+2. Agent creates a task file in `.plan/`
+3. Human reviews with `plan -k` or `plan tui`
 
 ## License
 

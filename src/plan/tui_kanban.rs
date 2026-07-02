@@ -9,7 +9,8 @@ use ratatui::{
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::config::{self, Config};
+use lib::Config;
+use tablethat_lib as lib;
 
 const FIELD_COUNT: usize = 4; // type, priority, area, slug
 
@@ -22,7 +23,7 @@ struct MarkdownTheme {
     code: Style,
 }
 
-fn theme_from_cfg(cfg: &config::ThemeConfig) -> MarkdownTheme {
+fn theme_from_cfg(cfg: &lib::ThemeConfig) -> MarkdownTheme {
     let bold_mod = match cfg.bold_style.as_str() {
         "bold" => Modifier::BOLD,
         "dim" => Modifier::DIM,
@@ -40,15 +41,15 @@ fn theme_from_cfg(cfg: &config::ThemeConfig) -> MarkdownTheme {
 
     MarkdownTheme {
         h1: Style::default()
-            .fg(config::parse_ratatui_color(&cfg.h1_color))
+            .fg(lib::parse_ratatui_color(&cfg.h1_color))
             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         h2: Style::default()
-            .fg(config::parse_ratatui_color(&cfg.h2_color))
+            .fg(lib::parse_ratatui_color(&cfg.h2_color))
             .add_modifier(Modifier::UNDERLINED),
-        h3: Style::default().fg(config::parse_ratatui_color(&cfg.h3_color)),
+        h3: Style::default().fg(lib::parse_ratatui_color(&cfg.h3_color)),
         bold: Style::default().add_modifier(bold_mod),
         dim: Style::default().add_modifier(emphasis_mod),
-        code: Style::default().fg(config::parse_ratatui_color(&cfg.code_color)),
+        code: Style::default().fg(lib::parse_ratatui_color(&cfg.code_color)),
     }
 }
 
@@ -87,7 +88,7 @@ struct App<'a> {
     preview_scroll: usize,
     preview_offset: usize,
     preview_width: usize,
-    themes: Vec<config::ThemeFile>,
+    themes: Vec<lib::theme::ThemeFile>,
     current_theme: usize,
 }
 
@@ -112,7 +113,7 @@ impl<'a> App<'a> {
             })
             .collect();
 
-        let themes = config::load_themes(cfg.themes_dir.as_deref());
+        let themes = lib::theme::load_themes(cfg.themes_dir.as_deref(), "plan");
 
         let mut app = Self {
             root,
@@ -779,7 +780,7 @@ impl App<'_> {
         }
     }
 
-    fn current_theme_config(&self) -> config::ThemeConfig {
+    fn current_theme_config(&self) -> lib::ThemeConfig {
         self.themes
             .get(self.current_theme)
             .map(|t| t.theme.clone())
@@ -1266,8 +1267,8 @@ fn render_markdown(th: &MarkdownTheme, text: &str, wrap: usize) -> Vec<Line<'sta
     flush(&mut lines, &mut spans);
     lines
 }
-fn status_color(status: &str, colors: &crate::config::ColorsConfig) -> Color {
-    config::parse_ratatui_color(match status {
+fn status_color(status: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
+    lib::parse_ratatui_color(match status {
         "in-progress" => &colors.status.in_progress,
         "open" => &colors.status.open,
         "blocked" => &colors.status.blocked,
@@ -1278,8 +1279,8 @@ fn status_color(status: &str, colors: &crate::config::ColorsConfig) -> Color {
     })
 }
 
-fn priority_color(p: &str, colors: &crate::config::ColorsConfig) -> Color {
-    config::parse_ratatui_color(match p {
+fn priority_color(p: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
+    lib::parse_ratatui_color(match p {
         "high" => &colors.priority.high,
         "medium" => &colors.priority.medium,
         "low" => &colors.priority.low,
@@ -1289,24 +1290,18 @@ fn priority_color(p: &str, colors: &crate::config::ColorsConfig) -> Color {
 
 #[cfg(test)]
 mod quick_table_test {
-    use crate::config;
-    use crate::tui::{render_markdown, theme_from_cfg};
+    use tablethat_lib::markdown::{render_markdown, theme_from_cfg};
     #[test]
     fn table_renders_header_and_body() {
         let md = "| **Name** | `Code` |\n|---|---|\n| foo | bar |\n";
-        let th = theme_from_cfg(&config::ThemeConfig::default());
+        let th = theme_from_cfg(&tablethat_lib::ThemeConfig::default());
         let lines = render_markdown(&th, md, 80);
-        // Should have header + separator + body + blank → at least 3 lines
         let total: String = lines
             .iter()
             .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
             .collect();
-        assert!(
-            total.contains("Name"),
-            "Missing header 'Name' in: {:?}",
-            lines
-        );
-        assert!(total.contains("foo"), "Missing body 'foo' in: {:?}", lines);
-        assert!(total.contains("="), "Missing separator in: {:?}", lines);
+        assert!(total.contains("Name"), "Missing header 'Name'");
+        assert!(total.contains("foo"), "Missing body 'foo'");
+        assert!(total.contains("="), "Missing separator");
     }
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Schema for .tasks/*.md YAML frontmatter. Filename (without .md) is the unique task key.",
+  "description": "Schema for .plan/*.md YAML frontmatter. Filename (without .md) is the unique task key.",
   "type": "object",
   "required": ["status", "type", "priority"],
   "properties": {

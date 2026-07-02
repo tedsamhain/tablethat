@@ -3,11 +3,19 @@ name = "tablethat"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Markdown-native task tracker with kanban TUI — table that thought and come back to it later"
+description = "plan + gloss — task management and markdown viewing"
+
+[lib]
+name = "tablethat_lib"
+path = "src/lib.rs"
 
 [[bin]]
-name = "tablethat"
-path = "src/main.rs"
+name = "plan"
+path = "src/bin/plan/main.rs"
+
+[[bin]]
+name = "gloss"
+path = "src/bin/gloss/main.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

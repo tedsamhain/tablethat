@@ -1,4 +1,4 @@
-# tablethat dev tasks
+# tablethat dev tasks — plan + gloss
 # Install just: cargo install just
 # Activate pre-commit hook: git config core.hooksPath .githooks
 
@@ -32,7 +32,7 @@ build:
 build-release:
     cargo build --release
 
-# Install tablethat binary to ~/.cargo/bin
+# Install plan and gloss binaries to ~/.cargo/bin
 [group('dev')]
 install:
     cargo install --path .

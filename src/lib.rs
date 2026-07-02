@@ -1,3 +1,6 @@
+pub mod markdown;
+pub mod theme;
+
 use figment::{
     Figment,
     providers::{Env, Format, Serialized, Toml},
@@ -109,18 +112,21 @@ impl Default for PriorityColors {
 impl Config {
     /// Load configuration with layered precedence:
     /// defaults < config file < env vars < CLI overrides
-    pub fn load(cli_config_path: Option<&Path>) -> Self {
+    ///
+    /// `app_name` is used for config file search paths (e.g. "plan" → plan.toml)
+    /// `env_prefix` is used for environment variable filtering (e.g. "PLAN_")
+    pub fn load(app_name: &str, env_prefix: &str, cli_config_path: Option<&Path>) -> Self {
         let mut figment = Figment::from(Serialized::defaults(Config::default()));
 
         // Layer 1: config file(s)
-        // Explicit --config flag
         if let Some(path) = cli_config_path {
             if path.exists() {
                 figment = figment.merge(Toml::file(path));
             }
         } else {
-            // T2_CONFIG env var
-            if let Ok(path) = std::env::var("T2_CONFIG") {
+            // Env var for config path
+            let config_env_key = format!("{env_prefix}CONFIG");
+            if let Ok(path) = std::env::var(&config_env_key) {
                 let p = PathBuf::from(&path);
                 if p.exists() {
                     figment = figment.merge(Toml::file(p));
@@ -128,13 +134,13 @@ impl Config {
             }
 
             // Project-local
-            let local = PathBuf::from("tablethat.toml");
+            let local = PathBuf::from(format!("{app_name}.toml"));
             if local.exists() {
                 figment = figment.merge(Toml::file(local));
             }
 
             // Platform config dir
-            if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "tablethat") {
+            if let Some(proj_dirs) = directories::ProjectDirs::from("", "", app_name) {
                 let sys_config = proj_dirs.config_dir().join("config.toml");
                 if sys_config.exists() {
                     figment = figment.merge(Toml::file(sys_config));
@@ -142,75 +148,48 @@ impl Config {
             }
         }
 
-        // Layer 2: environment variables (T2_ prefix)
-        figment = figment.merge(Env::prefixed("T2_"));
+        // Layer 2: environment variables
+        figment = figment.merge(Env::prefixed(env_prefix));
 
         figment.extract().unwrap_or_default()
     }
 }
 
-/// A theme loaded from a TOML file.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ThemeFile {
-    pub name: String,
-    pub theme: ThemeConfig,
-}
+/// Resolve a file by checking project-local, then config dir, then data dir.
+/// Returns the first path that exists, or None.
+pub fn resolve_file(
+    root: &Path,
+    plan_dir: &str,
+    local_name: &str,
+    global_name: &str,
+    app_name: &str,
+) -> Option<PathBuf> {
+    // Project-local (dot-prefixed)
+    let local = root.join(plan_dir).join(local_name);
+    if local.exists() {
+        return Some(local);
+    }
 
-/// Discover and load theme TOML files from a directory.
-/// Searches in order:
-/// 1. Explicit `themes_dir` path
-/// 2. `./themes/` relative to cwd
-/// 3. `~/.config/tablethat/themes/`
-pub fn load_themes(themes_dir: Option<&Path>) -> Vec<ThemeFile> {
-    let dirs: Vec<PathBuf> = if let Some(dir) = themes_dir {
-        vec![dir.to_path_buf()]
-    } else {
-        let mut candidates = vec![PathBuf::from("themes")];
-        if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "tablethat") {
-            candidates.push(proj_dirs.config_dir().join("themes"));
-        }
-        candidates
-    };
-
-    let mut themes = Vec::new();
-    for dir in &dirs {
-        if !dir.is_dir() {
-            continue;
-        }
-        let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
-            .into_iter()
-            .flatten()
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|ext| ext == "toml"))
-            .collect();
-        entries.sort();
-
-        for path in entries {
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(theme) = toml::from_str::<ThemeFile>(&content)
-            {
-                themes.push(theme);
-            }
-        }
-        if !themes.is_empty() {
-            break; // use first directory that has themes
+    // Config dir (user)
+    if let Some(proj_dirs) = directories::ProjectDirs::from("", "", app_name) {
+        let config_file = proj_dirs.config_dir().join(global_name);
+        if config_file.exists() {
+            return Some(config_file);
         }
     }
 
-    // Fallback: always have at least the built-in default
-    if themes.is_empty() {
-        themes.push(ThemeFile {
-            name: "default".into(),
-            theme: ThemeConfig::default(),
-        });
+    // Data dir (system)
+    if let Some(proj_dirs) = directories::ProjectDirs::from("", "", app_name) {
+        let data_file = proj_dirs.data_dir().join(global_name);
+        if data_file.exists() {
+            return Some(data_file);
+        }
     }
 
-    themes
+    None
 }
 
 /// Parse a color name string into a termcolor Color.
-/// Supports named colors and basic ANSI256 decimal values.
 pub fn parse_color(s: &str) -> termcolor::Color {
     match s.to_lowercase().as_str() {
         "black" => termcolor::Color::Black,
@@ -254,4 +233,16 @@ pub fn parse_ratatui_color(s: &str) -> ratatui::style::Color {
             }
         }
     }
+}
+
+pub fn workspace_root() -> PathBuf {
+    let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut candidate = Some(dir.as_path());
+    while let Some(path) = candidate {
+        if path.join(".plan").is_dir() {
+            return path.to_path_buf();
+        }
+        candidate = path.parent();
+    }
+    dir
 }

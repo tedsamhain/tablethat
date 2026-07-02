@@ -1,0 +1,10 @@
+# Default theme
+name = "default"
+
+[theme]
+h1_color = "cyan"
+h2_color = "cyan"
+h3_color = "cyan"
+code_color = "yellow"
+bold_style = "bold"
+emphasis_style = "underlined"

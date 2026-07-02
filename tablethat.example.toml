@@ -1,0 +1,38 @@
+# tablethat configuration
+# Copy to tablethat.toml or ~/.config/tablethat/config.toml
+
+# Repo root containing .tasks/ (default: auto-detect by walking up from cwd)
+# root = "/path/to/project"
+
+# Editor for task files (default: $EDITOR or "vi")
+# editor = "hx"
+
+# Default sort keys when --sort not given
+# default_sort = ["priority", "slug"]
+
+# Status column ordering for kanban view
+# kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
+
+# TUI preview theme colors
+# [theme]
+# h1_color = "cyan"
+# h2_color = "cyan"
+# h3_color = "cyan"
+# code_color = "yellow"
+# bold_style = "bold"        # bold, dim, italic, underlined
+# emphasis_style = "underlined"
+
+# Status label colors
+# [colors.status]
+# in_progress = "magenta"
+# open = "yellow"
+# blocked = "red"
+# backlog = "blue"
+# idea = "cyan"
+# done = "green"
+
+# Priority label colors
+# [colors.priority]
+# high = "red"
+# medium = "yellow"
+# low = "darkgray"

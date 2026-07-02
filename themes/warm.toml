@@ -1,0 +1,10 @@
+# Warm theme — earthy tones
+name = "warm"
+
+[theme]
+h1_color = "yellow"
+h2_color = "yellow"
+h3_color = "yellow"
+code_color = "red"
+bold_style = "bold"
+emphasis_style = "italic"

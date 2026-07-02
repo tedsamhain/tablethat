@@ -1,0 +1,10 @@
+# Monochrome theme — no color, structure only
+name = "mono"
+
+[theme]
+h1_color = "white"
+h2_color = "white"
+h3_color = "white"
+code_color = "gray"
+bold_style = "bold"
+emphasis_style = "dim"

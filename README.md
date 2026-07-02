@@ -4,11 +4,7 @@ Markdown-native task tracker with a kanban TUI.
 
 **Table that.** You're deep in task X. The AI agent finds something — a memory leak, a design smell, an interesting pattern. It's worth tracking, but not right now. `tablethat` captures it as a deferred task and gets out of your way.
 
-```
-tablethat "found auth token leak in retry logic" --type bug
-```
-
-Tasks live in `.plan/tasks/*.md` as markdown files with YAML frontmatter. The filesystem is the database, git is the audit trail.
+Tasks live in `.tasks/*.md` as markdown files with YAML frontmatter. The filesystem is the database, git is the audit trail.
 
 ## Install
 
@@ -41,7 +37,7 @@ tablethat --format
 
 ## Task format
 
-Each task is a markdown file in `.plan/tasks/`:
+Each task is a markdown file in `.tasks/`:
 
 ```markdown
 ---
@@ -60,7 +56,7 @@ Description and context. Agents append progress notes below.
 **Type:** `bug` · `feature` · `chore` · `decision` · `perf`
 **Priority:** `high` · `medium` · `low`
 
-Validation is driven by `.plan/schema.json` — edit it to add fields or constrain values.
+Validation is driven by `.tasks/.schema.json` — edit it to add fields or constrain values.
 
 ## TUI
 
@@ -77,15 +73,39 @@ Interactive kanban browser with keyboard navigation:
 | `Enter`          | Preview task (markdown)   |
 | `f`              | Filter by selected field  |
 | `e`              | Open task in `$EDITOR`    |
+| `c`              | Cycle preview theme       |
 | `q`              | Clear filters / quit      |
 | `Ctrl-c`         | Quit                      |
 
+### Themes
+
+Preview themes are TOML files discovered from:
+
+1. `themes/` directory in the project root
+2. `~/.config/tablethat/themes/` (platform config dir)
+
+Cycle through themes with `c` in preview mode. Create custom themes by copying `themes/default.toml` and editing colors:
+
+```toml
+name = "my-theme"
+
+[theme]
+h1_color = "green"
+h2_color = "cyan"
+h3_color = "cyan"
+code_color = "magenta"
+bold_style = "bold"
+emphasis_style = "underlined"
+```
+
+Override the themes directory in config: `themes_dir = "/path/to/my/themes"`.
+
 ## Integration with AI agents
 
-`tablethat` works naturally with AI coding agents. The `.plan/` directory convention gives agents a structured way to record discoveries:
+`tablethat` works naturally with AI coding agents. The `.tasks/` directory convention gives agents a structured way to record discoveries:
 
 1. Agent encounters something tangential during a task
-2. Agent runs `tablethat "summary" --status idea` to record it
+2. Agent creates a task file in `.tasks/`
 3. Human reviews with `tablethat -k` or `tablethat tui`
 
 The schema is human-readable markdown. No APIs, no databases, no coordination servers.
@@ -112,32 +132,27 @@ Prefix: `T2_`
 | `T2_ROOT` | `--root` |
 | `T2_EDITOR` | Editor fallback (overrides `$EDITOR`) |
 | `T2_CONFIG` | Config file path |
+| `T2_THEMES_DIR` | Themes directory path |
 
 ### Config keys
 
-All keys are optional. Example `tablethat.toml`:
+All keys are optional. See `tablethat.example.toml` for a full reference.
 
 ```toml
 root = "/path/to/project"
 editor = "hx"
+themes_dir = "/path/to/themes"
 default_sort = ["priority", "area", "slug"]
 kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
 
 [theme]
 h1_color = "green"
-h2_color = "cyan"
-h3_color = "cyan"
 code_color = "magenta"
-bold_style = "bold"        # bold, dim, italic, underlined
-emphasis_style = "underlined"
 
 [colors.status]
 in_progress = "magenta"
 open = "yellow"
 blocked = "red"
-backlog = "blue"
-idea = "cyan"
-done = "green"
 
 [colors.priority]
 high = "red"

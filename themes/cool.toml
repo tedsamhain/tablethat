@@ -1,0 +1,10 @@
+# Cool theme — blue/green tones
+name = "cool"
+
+[theme]
+h1_color = "green"
+h2_color = "green"
+h3_color = "cyan"
+code_color = "magenta"
+bold_style = "bold"
+emphasis_style = "dim"

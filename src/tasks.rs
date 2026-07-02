@@ -18,20 +18,19 @@ pub struct LoadedTask {
 }
 
 pub fn validate_all(root: &std::path::Path) -> bool {
-    let plan_dir = root.join(".plan");
-    let tasks_dir = plan_dir.join("tasks");
-    let schema_path = plan_dir.join("schema.json");
+    let tasks_dir = root.join(".tasks");
+    let schema_path = tasks_dir.join(".schema.json");
 
     let schema: serde_json::Value = match std::fs::read_to_string(&schema_path) {
         Ok(s) => match serde_json::from_str(&s) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!(".plan/schema.json: invalid JSON — {e}");
+                eprintln!(".tasks/.schema.json: invalid JSON — {e}");
                 return false;
             }
         },
         Err(e) => {
-            eprintln!(".plan/schema.json: cannot read — {e}");
+            eprintln!(".tasks/.schema.json: cannot read — {e}");
             return false;
         }
     };
@@ -52,10 +51,7 @@ pub fn validate_all(root: &std::path::Path) -> bool {
     };
 
     if entries.is_empty() {
-        eprintln!(
-            "warning: no .plan task files found in {}",
-            tasks_dir.display()
-        );
+        eprintln!("warning: no task files found in {}", tasks_dir.display());
     }
 
     let mut ok = true;
@@ -177,7 +173,7 @@ pub fn list_tasks(
 ) {
     let _ = validate_all(root);
 
-    let tasks_dir = root.join(".plan").join("tasks");
+    let tasks_dir = root.join(".tasks");
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,
@@ -577,7 +573,7 @@ pub fn read_task_files(tasks_dir: &std::path::Path) -> Result<Vec<PathBuf>, Stri
                 .map(|e| e.path())
                 .filter(|p| {
                     p.extension().is_some_and(|ext| ext == "md")
-                        && p.file_name().is_some_and(|n| n != "TEMPLATE.md")
+                        && p.file_name().is_some_and(|n| n != ".TEMPLATE.md")
                 })
                 .collect();
             v.sort();
@@ -614,17 +610,16 @@ fn parse_frontmatter(content: &str) -> Result<(String, usize), String> {
 }
 
 pub fn workspace_root() -> PathBuf {
-    let dir = std::env::var("CARGO_MANIFEST_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().unwrap());
-    // Walk up from parent (skip crate's own Cargo.toml) to find repo root
-    let mut candidate = dir.parent();
+    let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    // Walk up from cwd to find a .tasks/ directory
+    let mut candidate = Some(dir.as_path());
     while let Some(path) = candidate {
-        if path.join("Cargo.toml").exists() {
+        if path.join(".tasks").is_dir() {
             return path.to_path_buf();
         }
         candidate = path.parent();
     }
+    // Fallback: cwd
     dir
 }
 
@@ -717,7 +712,7 @@ fn value_to_yaml_str(val: &serde_yaml::Value) -> String {
 }
 
 pub fn normalize_all(root: &std::path::Path) -> bool {
-    let tasks_dir = root.join(".plan").join("tasks");
+    let tasks_dir = root.join(".tasks");
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,

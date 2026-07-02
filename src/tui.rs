@@ -22,15 +22,15 @@ struct MarkdownTheme {
     code: Style,
 }
 
-fn theme_from_config(cfg: &Config) -> MarkdownTheme {
-    let bold_mod = match cfg.theme.bold_style.as_str() {
+fn theme_from_cfg(cfg: &config::ThemeConfig) -> MarkdownTheme {
+    let bold_mod = match cfg.bold_style.as_str() {
         "bold" => Modifier::BOLD,
         "dim" => Modifier::DIM,
         "italic" => Modifier::ITALIC,
         "underlined" => Modifier::UNDERLINED,
         _ => Modifier::BOLD,
     };
-    let emphasis_mod = match cfg.theme.emphasis_style.as_str() {
+    let emphasis_mod = match cfg.emphasis_style.as_str() {
         "bold" => Modifier::BOLD,
         "dim" => Modifier::DIM,
         "italic" => Modifier::ITALIC,
@@ -40,15 +40,15 @@ fn theme_from_config(cfg: &Config) -> MarkdownTheme {
 
     MarkdownTheme {
         h1: Style::default()
-            .fg(config::parse_ratatui_color(&cfg.theme.h1_color))
+            .fg(config::parse_ratatui_color(&cfg.h1_color))
             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         h2: Style::default()
-            .fg(config::parse_ratatui_color(&cfg.theme.h2_color))
+            .fg(config::parse_ratatui_color(&cfg.h2_color))
             .add_modifier(Modifier::UNDERLINED),
-        h3: Style::default().fg(config::parse_ratatui_color(&cfg.theme.h3_color)),
+        h3: Style::default().fg(config::parse_ratatui_color(&cfg.h3_color)),
         bold: Style::default().add_modifier(bold_mod),
         dim: Style::default().add_modifier(emphasis_mod),
-        code: Style::default().fg(config::parse_ratatui_color(&cfg.theme.code_color)),
+        code: Style::default().fg(config::parse_ratatui_color(&cfg.code_color)),
     }
 }
 
@@ -86,8 +86,9 @@ struct App<'a> {
     preview: Vec<Line<'static>>,
     preview_scroll: usize,
     preview_offset: usize,
-    preview_theme: usize,
     preview_width: usize,
+    themes: Vec<config::ThemeFile>,
+    current_theme: usize,
 }
 
 struct Column {
@@ -111,6 +112,8 @@ impl<'a> App<'a> {
             })
             .collect();
 
+        let themes = config::load_themes(cfg.themes_dir.as_deref());
+
         let mut app = Self {
             root,
             cfg,
@@ -131,8 +134,9 @@ impl<'a> App<'a> {
             preview: Vec::new(),
             preview_scroll: 0,
             preview_offset: 0,
-            preview_theme: 0,
             preview_width: 80,
+            themes,
+            current_theme: 0,
         };
 
         app.sort_tasks();
@@ -216,7 +220,7 @@ pub fn run_tui(
     area_filter: Option<&str>,
     search_query: Option<&str>,
 ) {
-    let tasks_dir = root.join(".plan").join("tasks");
+    let tasks_dir = root.join(".tasks");
     let entries = crate::tasks::read_task_files(&tasks_dir).unwrap_or_default();
     let tasks = crate::tasks::load_and_filter_tasks(
         &entries,
@@ -320,9 +324,18 @@ impl App<'_> {
     fn render_preview(&mut self, frame: &mut Frame) {
         let [title_area, body_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
-        let theme = theme_from_config(self.cfg);
+        let theme_cfg = self.current_theme_config();
+        let theme = theme_from_cfg(&theme_cfg);
+        let theme_name = self
+            .themes
+            .get(self.current_theme)
+            .map(|t| t.name.as_str())
+            .unwrap_or("default");
         let title = Line::from(Span::styled(
-            " Preview \u{2014} q/Esc:close  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
+            format!(
+                " Preview [{}] \u{2014} q/Esc:close  c:theme  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
+                theme_name
+            ),
             Style::default().fg(Color::DarkGray),
         ));
         frame.render_widget(title, title_area);
@@ -655,6 +668,7 @@ impl App<'_> {
                         KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
                             return Ok(Action::Quit);
                         }
+                        KeyCode::Char('c') => self.cycle_theme(),
                         _ => {}
                     },
                     Mode::Browse => {
@@ -757,7 +771,7 @@ impl App<'_> {
         if let Some((_slug, path)) = self.current_task_path()
             && let Ok(content) = std::fs::read_to_string(path)
         {
-            self.preview_theme = 0;
+            self.current_theme = 0;
             self.render_content(&content);
             self.preview_scroll = 0;
             self.preview_offset = 0;
@@ -765,8 +779,27 @@ impl App<'_> {
         }
     }
 
+    fn current_theme_config(&self) -> config::ThemeConfig {
+        self.themes
+            .get(self.current_theme)
+            .map(|t| t.theme.clone())
+            .unwrap_or_else(|| self.cfg.theme.clone())
+    }
+
+    fn cycle_theme(&mut self) {
+        if !self.themes.is_empty() {
+            self.current_theme = (self.current_theme + 1) % self.themes.len();
+        }
+        if let Some((_slug, path)) = self.current_task_path()
+            && let Ok(content) = std::fs::read_to_string(path)
+        {
+            self.render_content(&content);
+        }
+    }
+
     fn render_content(&mut self, content: &str) {
-        let theme = theme_from_config(self.cfg);
+        let theme_cfg = self.current_theme_config();
+        let theme = theme_from_cfg(&theme_cfg);
         self.preview = render_markdown(&theme, content, self.preview_width);
     }
 
@@ -1256,12 +1289,12 @@ fn priority_color(p: &str, colors: &crate::config::ColorsConfig) -> Color {
 
 #[cfg(test)]
 mod quick_table_test {
-    use crate::config::Config;
-    use crate::tui::{render_markdown, theme_from_config};
+    use crate::config;
+    use crate::tui::{render_markdown, theme_from_cfg};
     #[test]
     fn table_renders_header_and_body() {
         let md = "| **Name** | `Code` |\n|---|---|\n| foo | bar |\n";
-        let th = theme_from_config(&Config::default());
+        let th = theme_from_cfg(&config::ThemeConfig::default());
         let lines = render_markdown(&th, md, 80);
         // Should have header + separator + body + blank → at least 3 lines
         let total: String = lines

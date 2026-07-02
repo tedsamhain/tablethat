@@ -134,7 +134,8 @@ impl<'a> App<'a> {
     }
 
     fn sort_tasks(&mut self) {
-        self.tasks.sort_by(|a, b| crate::tasks::cmp_tasks(a, b, &[]));
+        self.tasks
+            .sort_by(|a, b| crate::tasks::cmp_tasks(a, b, &[]));
     }
 
     fn reload_tasks(&mut self) {

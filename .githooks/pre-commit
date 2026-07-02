@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-commit hook — delegates to the root justfile.
+# Install once per clone:
+#   git config core.hooksPath .githooks
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! command -v just > /dev/null 2>&1; then
+  echo "[ pre-commit ] 'just' not found — install with: cargo install just"
+  exit 1
+fi
+
+just precommit

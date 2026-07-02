@@ -101,7 +101,7 @@ pub fn validate_all(root: &std::path::Path) -> bool {
             continue;
         }
 
-        let obj = parsed.as_object().unwrap();
+        let obj = parsed.as_object().expect("checked is_object above");
 
         for field in &required {
             if !obj.contains_key(*field) {
@@ -367,9 +367,9 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 macro_rules! write_colored {
     ($stdout:expr, $color:expr, $($arg:tt)*) => {{
-        $stdout.set_color(ColorSpec::new().set_fg(Some($color))).unwrap();
-        write!($stdout, $($arg)*).unwrap();
-        $stdout.reset().unwrap();
+        $stdout.set_color(ColorSpec::new().set_fg(Some($color))).expect("set_color failed");
+        write!($stdout, $($arg)*).expect("write failed");
+        $stdout.reset().expect("reset failed");
     }};
 }
 
@@ -444,9 +444,9 @@ fn display_kanban(
         let count = group.len();
         let bar = "─".repeat(bar_w);
 
-        writeln!(stdout).unwrap();
+        writeln!(stdout).expect("write failed");
         write_colored!(stdout, color, "{} ({})", label, count);
-        writeln!(stdout, " {}", bar).unwrap();
+        writeln!(stdout, " {}", bar).expect("write failed");
 
         if group.is_empty() {
             println!(" (none)");
@@ -461,20 +461,20 @@ fn display_kanban(
                     slug_w = slug_w,
                     type_w = type_w
                 )
-                .unwrap();
+                .expect("write failed");
                 write_colored!(stdout, pc, "{:<prio_w$}", t.task.priority, prio_w = prio_w);
-                writeln!(stdout, " {}", t.task.area).unwrap();
+                writeln!(stdout, " {}", t.task.area).expect("write failed");
             }
         }
     }
 
     println!();
-    write!(stdout, "{} tasks:", total).unwrap();
+    write!(stdout, "{} tasks:", total).expect("write failed");
     for (status, g) in groups.iter().filter(|(_, g)| !g.is_empty()) {
         let color = status_color(status, colors);
         write_colored!(stdout, color, " {} {}", g.len(), status);
     }
-    writeln!(stdout).unwrap();
+    writeln!(stdout).expect("write failed");
 }
 
 fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
@@ -512,7 +512,7 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
         let sc = status_color(&t.task.status, colors);
         let pc = priority_color(&t.task.priority, colors);
 
-        write!(stdout, "{:<slug_w$} ", t.slug, slug_w = slug_w).unwrap();
+        write!(stdout, "{:<slug_w$} ", t.slug, slug_w = slug_w).expect("write failed");
         write_colored!(
             stdout,
             sc,
@@ -520,9 +520,9 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
             t.task.status,
             status_w = status_w
         );
-        write!(stdout, " {:<type_w$} ", t.task.task_type, type_w = type_w).unwrap();
+        write!(stdout, " {:<type_w$} ", t.task.task_type, type_w = type_w).expect("write failed");
         write_colored!(stdout, pc, "{:<prio_w$}", t.task.priority, prio_w = prio_w);
-        writeln!(stdout, " {}", t.task.area).unwrap();
+        writeln!(stdout, " {}", t.task.area).expect("write failed");
     }
 
     let idea_count = tasks.iter().filter(|t| t.task.status == "idea").count();
@@ -535,8 +535,8 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
     let blocked_count = tasks.iter().filter(|t| t.task.status == "blocked").count();
     let done_count = tasks.iter().filter(|t| t.task.status == "done").count();
 
-    writeln!(stdout).unwrap();
-    write!(stdout, "{} tasks:", tasks.len()).unwrap();
+    writeln!(stdout).expect("write failed");
+    write!(stdout, "{} tasks:", tasks.len()).expect("write failed");
     if in_progress_count > 0 {
         write_colored!(
             stdout,
@@ -570,7 +570,7 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
     if done_count > 0 {
         write_colored!(stdout, status_color("done", colors), " {} done", done_count);
     }
-    writeln!(stdout).unwrap();
+    writeln!(stdout).expect("write failed");
 }
 
 pub fn read_task_files(tasks_dir: &std::path::Path) -> Result<Vec<PathBuf>, String> {
@@ -598,13 +598,13 @@ fn parse_frontmatter(content: &str) -> Result<(String, usize), String> {
     if first.is_none() {
         return Err("no frontmatter delimiters found".into());
     }
-    let (first_line, _) = first.unwrap();
+    let (first_line, _) = first.expect("checked is_none above");
 
     let second = lines.find(|(_, l)| l.trim() == "---");
     if second.is_none() {
         return Err("unclosed frontmatter (missing closing ---)".into());
     }
-    let (second_line, _) = second.unwrap();
+    let (second_line, _) = second.expect("checked is_none above");
 
     let start = first_line + 1;
     let end = second_line;

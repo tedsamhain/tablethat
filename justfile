@@ -13,7 +13,7 @@ format:
 # cargo fmt --check + cargo clippy
 check:
     cargo fmt --check
-    cargo clippy -- -D warnings -A clippy::unwrap_used
+    cargo clippy -- -D warnings
 
 # cargo test
 test:

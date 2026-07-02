@@ -8,30 +8,31 @@
 
 Task management with kanban TUI. Tasks live in `.plan/*.md` as markdown files with YAML frontmatter.
 
-```
-plan                    # list tasks
-plan -k                 # kanban view
-plan tui                # interactive TUI
-plan --lint             # validate frontmatter
-plan --init             # scaffold .plan/ directory
-```
+    plan                    # list tasks
+    plan -k                 # kanban view
+    plan tui                # interactive TUI
+    plan --lint             # validate frontmatter
+    plan --init             # scaffold .plan/ directory
 
 ### gloss
 
 Markdown viewer — filter mode for vim/pagers, TUI for browsing.
 
-```
-gloss README.md         # TUI single file viewer
-gloss docs/             # TUI directory browser
-cat file.md | gloss     # filter mode (stdin → stdout)
-:%!gloss                # vim filter
-```
+    gloss README.md         # TUI single file viewer
+    gloss docs/             # TUI directory browser
+    cat file.md | gloss     # filter mode (stdin → stdout)
+    :%!gloss                # vim filter
 
 ## Install
 
-```
-cargo install --path .
-```
+    cargo install --path .
+
+## Try without install
+
+    cargo plan -- list          # run plan from local build
+    cargo gloss -- README.md    # run gloss from local build
+
+These aliases (defined in `.cargo/config.toml`) run the locally built binaries via `cargo run`.
 
 ## Task format
 
@@ -50,20 +51,19 @@ area: backend
 Description and context.
 ```
 
-**Status:** `idea` · `backlog` · `open` · `in-progress` · `blocked` · `done`
-**Type:** `bug` · `feature` · `chore` · `decision` · `perf`
-**Priority:** `high` · `medium` · `low`
+**Status:** `idea` · `backlog` · `open` · `in-progress` · `blocked` · `done` **Type:** `bug` · `feature` ·
+`chore` · `decision` · `perf` **Priority:** `high` · `medium` · `low`
 
 Validation uses `.plan/.schema.json` (project-local), or falls back to `~/.config/plan/schema.json`.
 
 ## Configuration
 
-Both tools use layered configuration: **defaults < config file < env vars < CLI flags**.
+Both tools use layered configuration: **defaults \< config file \< env vars \< CLI flags**.
 
 ### plan
 
 | Source | Path |
-|---|---|
+| --- | --- |
 | Config file | `plan.toml` (project) / `~/.config/plan/config.toml` (user) |
 | Env prefix | `PLAN_` |
 | Env vars | `PLAN_ROOT`, `PLAN_EDITOR`, `PLAN_CONFIG`, `PLAN_THEMES_DIR` |
@@ -71,7 +71,7 @@ Both tools use layered configuration: **defaults < config file < env vars < CLI 
 ### gloss
 
 | Source | Path |
-|---|---|
+| --- | --- |
 | Config file | `gloss.toml` (project) / `~/.config/gloss/config.toml` (user) |
 | Env prefix | `GLOSS_` |
 | Env vars | `GLOSS_CONFIG`, `GLOSS_THEMES_DIR` |
@@ -92,7 +92,8 @@ Color values: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `dark
 
 ## Integration with AI agents
 
-`plan` works naturally with AI coding agents. The `.plan/` directory convention gives agents a structured way to record discoveries:
+`plan` works naturally with AI coding agents. The `.plan/` directory convention gives agents a structured way to record
+discoveries:
 
 1. Agent encounters something tangential during a task
 2. Agent creates a task file in `.plan/`

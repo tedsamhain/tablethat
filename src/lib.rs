@@ -8,6 +8,8 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+pub const PLAN_DIR: &str = ".plan";
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub root: Option<PathBuf>,
@@ -239,7 +241,7 @@ pub fn workspace_root() -> PathBuf {
     let dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut candidate = Some(dir.as_path());
     while let Some(path) = candidate {
-        if path.join(".plan").is_dir() {
+        if path.join(PLAN_DIR).is_dir() {
             return path.to_path_buf();
         }
         candidate = path.parent();

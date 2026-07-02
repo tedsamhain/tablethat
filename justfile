@@ -51,9 +51,14 @@ precommit:
     just check
     just test
 
+# Install dev tools
+[group('global')]
+install-dev:
+    cargo install sccache
+    cargo install cargo-deny cargo-audit just
+
 # Install dev tools + pre-commit hook
 [group('global')]
-setup-dev:
-    cargo install cargo-deny cargo-audit just
+setup-dev: install-dev
     git config core.hooksPath .githooks
     @echo "Pre-commit hook enabled"

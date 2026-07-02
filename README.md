@@ -90,6 +90,63 @@ Interactive kanban browser with keyboard navigation:
 
 The schema is human-readable markdown. No APIs, no databases, no coordination servers.
 
+## Configuration
+
+`tablethat` uses layered configuration: **defaults < config file < env vars < CLI flags**.
+
+### Config file search paths
+
+Checked in order (first found wins):
+
+1. `--config <path>` (explicit CLI flag)
+2. `$T2_CONFIG` env var
+3. `./tablethat.toml` (project-local)
+4. `~/.config/tablethat/config.toml` (Linux) / platform equivalent
+
+### Environment variables
+
+Prefix: `T2_`
+
+| Variable | Equivalent |
+|---|---|
+| `T2_ROOT` | `--root` |
+| `T2_EDITOR` | Editor fallback (overrides `$EDITOR`) |
+| `T2_CONFIG` | Config file path |
+
+### Config keys
+
+All keys are optional. Example `tablethat.toml`:
+
+```toml
+root = "/path/to/project"
+editor = "hx"
+default_sort = ["priority", "area", "slug"]
+kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
+
+[theme]
+h1_color = "green"
+h2_color = "cyan"
+h3_color = "cyan"
+code_color = "magenta"
+bold_style = "bold"        # bold, dim, italic, underlined
+emphasis_style = "underlined"
+
+[colors.status]
+in_progress = "magenta"
+open = "yellow"
+blocked = "red"
+backlog = "blue"
+idea = "cyan"
+done = "green"
+
+[colors.priority]
+high = "red"
+medium = "yellow"
+low = "darkgray"
+```
+
+Color values: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `darkgray`, `white`, or an ANSI256 decimal (e.g. `"8"`).
+
 ## License
 
 MIT OR Apache-2.0

@@ -18,3 +18,5 @@ ratatui = "0.30"
 crossterm = "0.28"
 clap = { version = "4", features = ["derive"] }
 pulldown-cmark = "0.12"
+figment = { version = "0.10", features = ["toml", "env"] }
+directories = "6"

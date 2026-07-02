@@ -1,3 +1,4 @@
+use crate::config::{self, ColorsConfig, Config};
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -15,8 +16,6 @@ pub struct LoadedTask {
     pub slug: String,
     pub task: Task,
 }
-
-pub const KANBAN_ORDER: &[&str] = &["idea", "backlog", "open", "in-progress", "blocked", "done"];
 
 pub fn validate_all(root: &std::path::Path) -> bool {
     let plan_dir = root.join(".plan");
@@ -167,6 +166,7 @@ pub fn validate_all(root: &std::path::Path) -> bool {
 #[allow(clippy::too_many_arguments)]
 pub fn list_tasks(
     root: &std::path::Path,
+    cfg: &Config,
     status_filter: Option<&str>,
     type_filter: Option<&str>,
     priority_filter: Option<&str>,
@@ -201,12 +201,17 @@ pub fn list_tasks(
         return;
     }
 
-    tasks.sort_by(|a, b| cmp_tasks(a, b, sort_keys));
+    let effective_sort: Vec<String> = if sort_keys.is_empty() {
+        cfg.default_sort.clone()
+    } else {
+        sort_keys.to_vec()
+    };
+    tasks.sort_by(|a, b| cmp_tasks(a, b, &effective_sort, &cfg.kanban_order));
 
     if kanban {
-        display_kanban(&tasks, sort_keys);
+        display_kanban(&tasks, &cfg.kanban_order, &cfg.colors, &effective_sort);
     } else {
-        display_table(&tasks);
+        display_table(&tasks, &cfg.colors);
     }
 }
 
@@ -296,7 +301,12 @@ pub fn load_and_filter_tasks(
     tasks
 }
 
-pub fn cmp_tasks(a: &LoadedTask, b: &LoadedTask, sort_keys: &[String]) -> std::cmp::Ordering {
+pub fn cmp_tasks(
+    a: &LoadedTask,
+    b: &LoadedTask,
+    sort_keys: &[String],
+    kanban_order: &[String],
+) -> std::cmp::Ordering {
     let keys: &[String] = if sort_keys.is_empty() {
         &["priority".into(), "slug".into()]
     } else {
@@ -304,7 +314,7 @@ pub fn cmp_tasks(a: &LoadedTask, b: &LoadedTask, sort_keys: &[String]) -> std::c
     };
 
     for key in keys {
-        let ord = cmp_by_key(a, b, key);
+        let ord = cmp_by_key(a, b, key, kanban_order);
         if ord != std::cmp::Ordering::Equal {
             return ord;
         }
@@ -312,11 +322,16 @@ pub fn cmp_tasks(a: &LoadedTask, b: &LoadedTask, sort_keys: &[String]) -> std::c
     std::cmp::Ordering::Equal
 }
 
-pub fn cmp_by_key(a: &LoadedTask, b: &LoadedTask, key: &str) -> std::cmp::Ordering {
+pub fn cmp_by_key(
+    a: &LoadedTask,
+    b: &LoadedTask,
+    key: &str,
+    kanban_order: &[String],
+) -> std::cmp::Ordering {
     match key {
         "status" => {
-            let oa = kanban_ord(&a.task.status);
-            let ob = kanban_ord(&b.task.status);
+            let oa = kanban_ord(&a.task.status, kanban_order);
+            let ob = kanban_ord(&b.task.status, kanban_order);
             oa.cmp(&ob)
         }
         "type" => a.task.task_type.cmp(&b.task.task_type),
@@ -327,10 +342,10 @@ pub fn cmp_by_key(a: &LoadedTask, b: &LoadedTask, key: &str) -> std::cmp::Orderi
     }
 }
 
-fn kanban_ord(status: &str) -> u8 {
-    KANBAN_ORDER
+fn kanban_ord(status: &str, kanban_order: &[String]) -> u8 {
+    kanban_order
         .iter()
-        .position(|&s| s == status)
+        .position(|s| s == status)
         .map_or(99, |i| i as u8)
 }
 
@@ -354,25 +369,27 @@ macro_rules! write_colored {
     }};
 }
 
-fn status_color(status: &str) -> Color {
-    match status {
-        "in-progress" => Color::Magenta,
-        "open" => Color::Yellow,
-        "blocked" => Color::Red,
-        "backlog" => Color::Blue,
-        "idea" => Color::Cyan,
-        "done" => Color::Green,
-        _ => Color::White,
-    }
+fn status_color(status: &str, colors: &ColorsConfig) -> Color {
+    let s = match status {
+        "in-progress" => &colors.status.in_progress,
+        "open" => &colors.status.open,
+        "blocked" => &colors.status.blocked,
+        "backlog" => &colors.status.backlog,
+        "idea" => &colors.status.idea,
+        "done" => &colors.status.done,
+        _ => return Color::White,
+    };
+    config::parse_color(s)
 }
 
-fn priority_color(p: &str) -> Color {
-    match p {
-        "high" => Color::Red,
-        "medium" => Color::Yellow,
-        "low" => Color::Ansi256(8),
-        _ => Color::White,
-    }
+fn priority_color(p: &str, colors: &ColorsConfig) -> Color {
+    let s = match p {
+        "high" => &colors.priority.high,
+        "medium" => &colors.priority.medium,
+        "low" => &colors.priority.low,
+        _ => return Color::White,
+    };
+    config::parse_color(s)
 }
 
 fn status_label(status: &str) -> &str {
@@ -387,19 +404,24 @@ fn status_label(status: &str) -> &str {
     }
 }
 
-fn display_kanban(tasks: &[LoadedTask], sort_keys: &[String]) {
+fn display_kanban(
+    tasks: &[LoadedTask],
+    kanban_order: &[String],
+    colors: &ColorsConfig,
+    sort_keys: &[String],
+) {
     let mut groups: Vec<(&str, Vec<&LoadedTask>)> = Vec::new();
     let mut total = 0;
 
-    for &status in KANBAN_ORDER {
+    for status in kanban_order {
         let mut group: Vec<&LoadedTask> =
-            tasks.iter().filter(|t| t.task.status == status).collect();
-        group.sort_by(|a, b| cmp_tasks(a, b, sort_keys));
+            tasks.iter().filter(|t| &t.task.status == status).collect();
+        group.sort_by(|a, b| cmp_tasks(a, b, sort_keys, kanban_order));
         total += group.len();
         groups.push((status, group));
     }
 
-    let label_w = KANBAN_ORDER
+    let label_w = kanban_order
         .iter()
         .map(|s| status_label(s).len())
         .max()
@@ -414,7 +436,7 @@ fn display_kanban(tasks: &[LoadedTask], sort_keys: &[String]) {
 
     for (status, group) in &groups {
         let label = status_label(status);
-        let color = status_color(status);
+        let color = status_color(status, colors);
         let count = group.len();
         let bar = "─".repeat(bar_w);
 
@@ -426,7 +448,7 @@ fn display_kanban(tasks: &[LoadedTask], sort_keys: &[String]) {
             println!(" (none)");
         } else {
             for t in group {
-                let pc = priority_color(&t.task.priority);
+                let pc = priority_color(&t.task.priority, colors);
                 write!(
                     stdout,
                     " {:<slug_w$} {:<type_w$} ",
@@ -445,13 +467,13 @@ fn display_kanban(tasks: &[LoadedTask], sort_keys: &[String]) {
     println!();
     write!(stdout, "{} tasks:", total).unwrap();
     for (status, g) in groups.iter().filter(|(_, g)| !g.is_empty()) {
-        let color = status_color(status);
+        let color = status_color(status, colors);
         write_colored!(stdout, color, " {} {}", g.len(), status);
     }
     writeln!(stdout).unwrap();
 }
 
-fn display_table(tasks: &[LoadedTask]) {
+fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
     let slug_w = tasks.iter().map(|t| t.slug.len()).max().unwrap_or(4).max(4);
     let status_w = 11;
     let type_w = 8;
@@ -483,8 +505,8 @@ fn display_table(tasks: &[LoadedTask]) {
     let mut stdout = StandardStream::stdout(ColorChoice::Auto);
 
     for t in tasks {
-        let sc = status_color(&t.task.status);
-        let pc = priority_color(&t.task.priority);
+        let sc = status_color(&t.task.status, colors);
+        let pc = priority_color(&t.task.priority, colors);
 
         write!(stdout, "{:<slug_w$} ", t.slug, slug_w = slug_w).unwrap();
         write_colored!(
@@ -512,22 +534,37 @@ fn display_table(tasks: &[LoadedTask]) {
     writeln!(stdout).unwrap();
     write!(stdout, "{} tasks:", tasks.len()).unwrap();
     if in_progress_count > 0 {
-        write_colored!(stdout, Color::Blue, " {} in-progress", in_progress_count);
+        write_colored!(
+            stdout,
+            status_color("in-progress", colors),
+            " {} in-progress",
+            in_progress_count
+        );
     }
     if open_count > 0 {
-        write_colored!(stdout, Color::Yellow, " {} open", open_count);
+        write_colored!(stdout, status_color("open", colors), " {} open", open_count);
     }
     if blocked_count > 0 {
-        write_colored!(stdout, Color::Red, " {} blocked", blocked_count);
+        write_colored!(
+            stdout,
+            status_color("blocked", colors),
+            " {} blocked",
+            blocked_count
+        );
     }
     if backlog_count > 0 {
-        write_colored!(stdout, Color::Ansi256(8), " {} backlog", backlog_count);
+        write_colored!(
+            stdout,
+            status_color("backlog", colors),
+            " {} backlog",
+            backlog_count
+        );
     }
     if idea_count > 0 {
-        write_colored!(stdout, Color::Cyan, " {} idea", idea_count);
+        write_colored!(stdout, status_color("idea", colors), " {} idea", idea_count);
     }
     if done_count > 0 {
-        write_colored!(stdout, Color::Green, " {} done", done_count);
+        write_colored!(stdout, status_color("done", colors), " {} done", done_count);
     }
     writeln!(stdout).unwrap();
 }
@@ -800,8 +837,16 @@ mod tests {
         let a = make_task("open", "bug", "medium", "", "alpha");
         let b = make_task("open", "feature", "high", "", "beta");
         let empty: [String; 0] = [];
-        assert_eq!(cmp_tasks(&a, &b, &empty), std::cmp::Ordering::Greater);
-        assert_eq!(cmp_tasks(&b, &a, &empty), std::cmp::Ordering::Less);
+        let ko: Vec<String> = vec![
+            "idea".into(),
+            "backlog".into(),
+            "open".into(),
+            "in-progress".into(),
+            "blocked".into(),
+            "done".into(),
+        ];
+        assert_eq!(cmp_tasks(&a, &b, &empty, &ko), std::cmp::Ordering::Greater);
+        assert_eq!(cmp_tasks(&b, &a, &empty, &ko), std::cmp::Ordering::Less);
     }
 
     #[test]
@@ -809,7 +854,15 @@ mod tests {
         let a = make_task("open", "bug", "high", "", "alpha");
         let b = make_task("open", "feature", "high", "", "beta");
         let empty: [String; 0] = [];
-        assert_eq!(cmp_tasks(&a, &b, &empty), std::cmp::Ordering::Less);
+        let ko: Vec<String> = vec![
+            "idea".into(),
+            "backlog".into(),
+            "open".into(),
+            "in-progress".into(),
+            "blocked".into(),
+            "done".into(),
+        ];
+        assert_eq!(cmp_tasks(&a, &b, &empty, &ko), std::cmp::Ordering::Less);
     }
 
     #[test]
@@ -817,7 +870,15 @@ mod tests {
         let a = make_task("open", "bug", "high", "backend", "x");
         let b = make_task("open", "feature", "low", "frontend", "x");
         let keys = ["area".into(), "priority".into()];
-        assert_eq!(cmp_tasks(&a, &b, &keys), std::cmp::Ordering::Less);
+        let ko: Vec<String> = vec![
+            "idea".into(),
+            "backlog".into(),
+            "open".into(),
+            "in-progress".into(),
+            "blocked".into(),
+            "done".into(),
+        ];
+        assert_eq!(cmp_tasks(&a, &b, &keys, &ko), std::cmp::Ordering::Less);
     }
 
     #[test]
@@ -825,7 +886,15 @@ mod tests {
         let a = make_task("idea", "feature", "low", "", "x");
         let b = make_task("open", "feature", "low", "", "x");
         let keys = ["status".into()];
-        assert_eq!(cmp_tasks(&a, &b, &keys), std::cmp::Ordering::Less);
+        let ko: Vec<String> = vec![
+            "idea".into(),
+            "backlog".into(),
+            "open".into(),
+            "in-progress".into(),
+            "blocked".into(),
+            "done".into(),
+        ];
+        assert_eq!(cmp_tasks(&a, &b, &keys, &ko), std::cmp::Ordering::Less);
     }
 
     #[test]

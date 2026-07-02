@@ -9,10 +9,11 @@ use ratatui::{
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::config::{self, Config};
+
 const FIELD_COUNT: usize = 4; // type, priority, area, slug
 
 struct MarkdownTheme {
-    name: &'static str,
     h1: Style,
     h2: Style,
     h3: Style,
@@ -21,35 +22,34 @@ struct MarkdownTheme {
     code: Style,
 }
 
-fn themes() -> Vec<MarkdownTheme> {
-    vec![
-        MarkdownTheme {
-            name: "default",
-            h1: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            h2: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::UNDERLINED),
-            h3: Style::default().fg(Color::Cyan),
-            bold: Style::default().add_modifier(Modifier::BOLD),
-            dim: Style::default().add_modifier(Modifier::UNDERLINED),
-            code: Style::default().fg(Color::Yellow),
-        },
-        MarkdownTheme {
-            name: "classic",
-            h1: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            h2: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::UNDERLINED),
-            h3: Style::default().fg(Color::Cyan),
-            bold: Style::default().add_modifier(Modifier::BOLD),
-            dim: Style::default().add_modifier(Modifier::UNDERLINED),
-            code: Style::default().fg(Color::Yellow),
-        },
-    ]
+fn theme_from_config(cfg: &Config) -> MarkdownTheme {
+    let bold_mod = match cfg.theme.bold_style.as_str() {
+        "bold" => Modifier::BOLD,
+        "dim" => Modifier::DIM,
+        "italic" => Modifier::ITALIC,
+        "underlined" => Modifier::UNDERLINED,
+        _ => Modifier::BOLD,
+    };
+    let emphasis_mod = match cfg.theme.emphasis_style.as_str() {
+        "bold" => Modifier::BOLD,
+        "dim" => Modifier::DIM,
+        "italic" => Modifier::ITALIC,
+        "underlined" => Modifier::UNDERLINED,
+        _ => Modifier::UNDERLINED,
+    };
+
+    MarkdownTheme {
+        h1: Style::default()
+            .fg(config::parse_ratatui_color(&cfg.theme.h1_color))
+            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        h2: Style::default()
+            .fg(config::parse_ratatui_color(&cfg.theme.h2_color))
+            .add_modifier(Modifier::UNDERLINED),
+        h3: Style::default().fg(config::parse_ratatui_color(&cfg.theme.h3_color)),
+        bold: Style::default().add_modifier(bold_mod),
+        dim: Style::default().add_modifier(emphasis_mod),
+        code: Style::default().fg(config::parse_ratatui_color(&cfg.theme.code_color)),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -68,6 +68,7 @@ enum Mode {
 struct App<'a> {
     #[allow(dead_code)]
     root: &'a Path,
+    cfg: &'a Config,
     entries: Vec<PathBuf>,
     tasks: Vec<crate::tasks::LoadedTask>,
     task_paths: HashMap<String, PathBuf>,
@@ -95,7 +96,12 @@ struct Column {
 }
 
 impl<'a> App<'a> {
-    fn new(root: &'a Path, tasks: Vec<crate::tasks::LoadedTask>, entries: Vec<PathBuf>) -> Self {
+    fn new(
+        root: &'a Path,
+        cfg: &'a Config,
+        tasks: Vec<crate::tasks::LoadedTask>,
+        entries: Vec<PathBuf>,
+    ) -> Self {
         let path_map: HashMap<String, PathBuf> = entries
             .iter()
             .filter_map(|p| {
@@ -107,6 +113,7 @@ impl<'a> App<'a> {
 
         let mut app = Self {
             root,
+            cfg,
             entries,
             tasks,
             task_paths: path_map,
@@ -135,7 +142,7 @@ impl<'a> App<'a> {
 
     fn sort_tasks(&mut self) {
         self.tasks
-            .sort_by(|a, b| crate::tasks::cmp_tasks(a, b, &[]));
+            .sort_by(|a, b| crate::tasks::cmp_tasks(a, b, &[], &self.cfg.kanban_order));
     }
 
     fn reload_tasks(&mut self) {
@@ -172,14 +179,14 @@ impl<'a> App<'a> {
     }
 
     fn rebuild_columns(&mut self) {
-        let kanban_order = crate::tasks::KANBAN_ORDER;
+        let kanban_order = &self.cfg.kanban_order;
         let mut columns = Vec::new();
-        for &status in kanban_order {
+        for status in kanban_order {
             let indices: Vec<usize> = self
                 .tasks
                 .iter()
                 .enumerate()
-                .filter(|(_, t)| t.task.status == status)
+                .filter(|(_, t)| &t.task.status == status)
                 .map(|(i, _)| i)
                 .collect();
             columns.push(Column {
@@ -202,6 +209,7 @@ impl<'a> App<'a> {
 
 pub fn run_tui(
     root: &Path,
+    cfg: &Config,
     status_filter: Option<&str>,
     type_filter: Option<&str>,
     priority_filter: Option<&str>,
@@ -224,7 +232,7 @@ pub fn run_tui(
         return;
     }
 
-    let mut app = App::new(root, tasks, entries);
+    let mut app = App::new(root, cfg, tasks, entries);
     let mut terminal = match ratatui::try_init() {
         Ok(t) => t,
         Err(e) => {
@@ -249,7 +257,9 @@ pub fn run_tui(
                 Action::OpenEditor => {
                     if let Some((_slug, path)) = app.current_task_path() {
                         ratatui::restore();
-                        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+                        let editor = cfg.editor.clone().unwrap_or_else(|| {
+                            std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string())
+                        });
                         let status = std::process::Command::new(&editor).arg(path).status();
                         if let Ok(s) = status
                             && !s.success()
@@ -310,13 +320,9 @@ impl App<'_> {
     fn render_preview(&mut self, frame: &mut Frame) {
         let [title_area, body_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
-        let ts = themes();
-        let tn = ts[self.preview_theme.min(ts.len() - 1)].name;
+        let theme = theme_from_config(self.cfg);
         let title = Line::from(Span::styled(
-            format!(
-                " Preview [{}] \u{2014} q/Esc:close  c:theme  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
-                tn
-            ),
+            " Preview \u{2014} q/Esc:close  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
             Style::default().fg(Color::DarkGray),
         ));
         frame.render_widget(title, title_area);
@@ -327,11 +333,7 @@ impl App<'_> {
             && let Ok(content) = std::fs::read_to_string(path)
         {
             self.preview_width = tw;
-            self.preview = render_markdown(
-                &themes()[self.preview_theme.min(themes().len() - 1)],
-                &content,
-                tw,
-            );
+            self.preview = render_markdown(&theme, &content, tw);
             self.preview_scroll = 0;
             self.preview_offset = 0;
         }
@@ -448,7 +450,7 @@ impl App<'_> {
 
         for (col_idx, column) in self.columns.iter().enumerate() {
             let is_active = col_idx == self.selected_column;
-            let color = status_color(&column.status);
+            let color = status_color(&column.status, &self.cfg.colors);
 
             let header = format!(
                 "{} ({})",
@@ -526,7 +528,7 @@ impl App<'_> {
                     spans.push(Span::styled(content, type_st));
 
                     // Priority (field 1) — vivid colors get colored bg, low uses plain row highlight
-                    let pc = priority_color(&task.task.priority);
+                    let pc = priority_color(&task.task.priority, &self.cfg.colors);
                     let vivid = is_vivid(pc);
                     let content = if is_act(1) {
                         format!(
@@ -653,7 +655,6 @@ impl App<'_> {
                         KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
                             return Ok(Action::Quit);
                         }
-                        KeyCode::Char('c') => self.cycle_theme(),
                         _ => {}
                     },
                     Mode::Browse => {
@@ -764,19 +765,9 @@ impl App<'_> {
         }
     }
 
-    fn cycle_theme(&mut self) {
-        if let Some((_slug, path)) = self.current_task_path()
-            && let Ok(content) = std::fs::read_to_string(path)
-        {
-            self.preview_theme = (self.preview_theme + 1) % themes().len();
-            self.render_content(&content);
-        }
-    }
-
     fn render_content(&mut self, content: &str) {
-        let ts = themes();
-        let theme = &ts[self.preview_theme.min(ts.len() - 1)];
-        self.preview = render_markdown(theme, content, self.preview_width);
+        let theme = theme_from_config(self.cfg);
+        self.preview = render_markdown(&theme, content, self.preview_width);
     }
 
     fn current_task_path(&self) -> Option<(&str, &Path)> {
@@ -1242,35 +1233,36 @@ fn render_markdown(th: &MarkdownTheme, text: &str, wrap: usize) -> Vec<Line<'sta
     flush(&mut lines, &mut spans);
     lines
 }
-fn status_color(status: &str) -> Color {
-    match status {
-        "in-progress" => Color::Magenta,
-        "open" => Color::Yellow,
-        "blocked" => Color::Red,
-        "backlog" => Color::Blue,
-        "idea" => Color::Cyan,
-        "done" => Color::Green,
-        _ => Color::White,
-    }
+fn status_color(status: &str, colors: &crate::config::ColorsConfig) -> Color {
+    config::parse_ratatui_color(match status {
+        "in-progress" => &colors.status.in_progress,
+        "open" => &colors.status.open,
+        "blocked" => &colors.status.blocked,
+        "backlog" => &colors.status.backlog,
+        "idea" => &colors.status.idea,
+        "done" => &colors.status.done,
+        _ => return Color::White,
+    })
 }
 
-fn priority_color(p: &str) -> Color {
-    match p {
-        "high" => Color::Red,
-        "medium" => Color::Yellow,
-        "low" => Color::DarkGray,
-        _ => Color::White,
-    }
+fn priority_color(p: &str, colors: &crate::config::ColorsConfig) -> Color {
+    config::parse_ratatui_color(match p {
+        "high" => &colors.priority.high,
+        "medium" => &colors.priority.medium,
+        "low" => &colors.priority.low,
+        _ => return Color::White,
+    })
 }
 
 #[cfg(test)]
 mod quick_table_test {
-    use crate::tui::{render_markdown, themes};
+    use crate::config::Config;
+    use crate::tui::{render_markdown, theme_from_config};
     #[test]
     fn table_renders_header_and_body() {
         let md = "| **Name** | `Code` |\n|---|---|\n| foo | bar |\n";
-        let th = &themes()[0];
-        let lines = render_markdown(th, md, 80);
+        let th = theme_from_config(&Config::default());
+        let lines = render_markdown(&th, md, 80);
         // Should have header + separator + body + blank → at least 3 lines
         let total: String = lines
             .iter()

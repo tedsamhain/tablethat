@@ -1,3 +1,4 @@
+mod config;
 mod tasks;
 mod tui;
 
@@ -14,6 +15,10 @@ use std::path::PathBuf;
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    /// Path to config file (default: auto-detect)
+    #[arg(long, global = true, value_name = "PATH")]
+    config: Option<PathBuf>,
 
     /// Repo root containing .plan (default: auto-detect)
     #[arg(short, long, global = true, value_name = "PATH")]
@@ -85,7 +90,16 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    let root = cli.root.unwrap_or_else(tasks::workspace_root);
+    // Load layered config: defaults < file < env < CLI
+    let mut cfg = config::Config::load(cli.config.as_deref());
+
+    // CLI --root overrides config root
+    if cli.root.is_some() {
+        cfg.root = cli.root;
+    }
+
+    // Resolve root: config/CLI > auto-detect
+    let root = cfg.root.clone().unwrap_or_else(tasks::workspace_root);
 
     // Resolve filter values — prefer subcommand flags, fall back to top-level
     let (status_filter, type_filter, priority_filter, area_filter, search_query) =
@@ -116,6 +130,7 @@ fn main() {
         Some(Commands::Tui { .. }) => {
             tui::run_tui(
                 &root,
+                &cfg,
                 status_filter,
                 type_filter,
                 priority_filter,
@@ -136,6 +151,7 @@ fn main() {
 
             tasks::list_tasks(
                 &root,
+                &cfg,
                 status_filter,
                 type_filter,
                 priority_filter,

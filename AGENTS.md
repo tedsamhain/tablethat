@@ -35,7 +35,7 @@ No integration test harness exists yet (`tests/` is empty). Tests are inline in 
 ```
 src/
   lib.rs              — Config, parse_color, workspace_root, resolve_file
-  markdown.rs         — pulldown-cmark markdown rendering
+  markdown.rs         — comrak markdown rendering + formatting
   theme.rs            — theme loading from TOML files
   bin/plan/main.rs    — plan CLI (clap derive)
   bin/gloss/main.rs   — gloss CLI (clap derive)
@@ -79,4 +79,4 @@ Every task lives as a markdown file in `.plan/tasks/<slug>.md` with YAML frontma
 - **Update:** update 'status' to reflect status. append progress notes at the bottom (newest first). Do not rewrite history.
 - **Complete:** set `status: done` when finished. Do not delete the file.
 - **Block:** set `status: blocked` and note the blocker in the body.
-- **Validate:** run `plan --lint` to check; `plan --format` to auto-fix. The precommit hook runs `--format` automatically
+- **Validate:** run `plan --lint` to check; `plan --format` to auto-fix. `plan --format PATH` formats a specific file or directory. The precommit hook runs `--format` automatically

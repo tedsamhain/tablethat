@@ -58,9 +58,9 @@ struct Cli {
     #[arg(long)]
     lint: bool,
 
-    /// Normalize frontmatter + body, then exit
-    #[arg(long)]
-    format: bool,
+    /// Normalize frontmatter + body, then exit (default: .plan/*.md, or specify path)
+    #[arg(long, value_name = "PATH")]
+    format: Option<Option<PathBuf>>,
 
     /// Initialize a .plan/ directory with default schema and template
     #[arg(long)]
@@ -152,9 +152,37 @@ fn main() {
                 std::process::exit(if ok { 0 } else { 1 });
             }
 
-            if cli.format {
-                tasks::normalize_all(&root);
-                return;
+            if let Some(format_path) = cli.format {
+                match format_path {
+                    Some(path) => {
+                        if path.is_dir() {
+                            let entries: Vec<PathBuf> = std::fs::read_dir(&path)
+                                .into_iter()
+                                .flatten()
+                                .filter_map(|e| e.ok())
+                                .map(|e| e.path())
+                                .filter(|p| p.extension().is_some_and(|ext| ext == "md"))
+                                .collect();
+                            let mut ok = true;
+                            for entry in &entries {
+                                if !tasks::format_file(entry, 120) {
+                                    ok = false;
+                                }
+                            }
+                            std::process::exit(if ok { 0 } else { 1 });
+                        } else if path.is_file() {
+                            let ok = tasks::format_file(&path, 120);
+                            std::process::exit(if ok { 0 } else { 1 });
+                        } else {
+                            eprintln!("{}: not a file or directory", path.display());
+                            std::process::exit(1);
+                        }
+                    }
+                    None => {
+                        tasks::normalize_all(&root);
+                        return;
+                    }
+                }
             }
 
             tasks::list_tasks(

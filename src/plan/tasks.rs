@@ -18,7 +18,7 @@ pub struct LoadedTask {
 }
 
 pub fn validate_all(root: &std::path::Path) -> bool {
-    let tasks_dir = root.join(".plan");
+    let tasks_dir = root.join(lib::PLAN_DIR);
 
     let schema_path = match lib::resolve_file(root, ".plan", ".schema.json", "schema.json", "plan")
     {
@@ -181,7 +181,7 @@ pub fn list_tasks(
 ) {
     let _ = validate_all(root);
 
-    let tasks_dir = root.join(".plan");
+    let tasks_dir = root.join(lib::PLAN_DIR);
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,
@@ -661,6 +661,7 @@ pub fn init_plan(root: &std::path::Path) {
 /// Preserves the body text and any unknown fields exactly. Returns the full markdown.
 fn normalize_frontmatter(content: &str) -> Result<String, String> {
     const CANONICAL_ORDER: &[&str] = &["status", "type", "priority", "area"];
+    const FORMAT_WIDTH: usize = 120;
 
     let (fml, start_line) = parse_frontmatter(content)?;
 
@@ -697,40 +698,16 @@ fn normalize_frontmatter(content: &str) -> Result<String, String> {
 
     if let Some(body_start) = line_before_body {
         let rest: Vec<&str> = content.lines().skip(body_start + 1).collect();
-        let cleaned = normalize_body_lines(&rest);
-        if !cleaned.is_empty() {
+        let body = rest.join("\n");
+        let formatted = format_markdown_body(&body, FORMAT_WIDTH);
+        let trimmed = formatted.trim();
+        if !trimmed.is_empty() {
             lines.push(String::new());
-            lines.extend(cleaned);
+            lines.push(trimmed.to_string());
         }
     }
 
     Ok(lines.join("\n") + "\n")
-}
-
-fn normalize_body_lines(lines: &[&str]) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut prev_blank = false;
-
-    for line in lines {
-        let trimmed = line.trim_end();
-        let is_blank = trimmed.is_empty();
-
-        if is_blank {
-            if !prev_blank && !out.is_empty() {
-                out.push(String::new());
-            }
-            prev_blank = true;
-        } else {
-            out.push(trimmed.to_string());
-            prev_blank = false;
-        }
-    }
-
-    while out.last().is_some_and(|l| l.is_empty()) {
-        out.pop();
-    }
-
-    out
 }
 
 fn value_to_yaml_str(val: &serde_yaml::Value) -> String {
@@ -745,8 +722,48 @@ fn value_to_yaml_str(val: &serde_yaml::Value) -> String {
     }
 }
 
+fn format_markdown_body(body: &str, width: usize) -> String {
+    lib::markdown::format_commonmark(body, width)
+}
+
+pub fn format_file(path: &std::path::Path, width: usize) -> bool {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{}: cannot read — {e}", path.display());
+            return false;
+        }
+    };
+
+    let formatted = if path.extension().is_some_and(|ext| ext == "md") {
+        // Check if file has frontmatter
+        if content.trim_start().starts_with("---") {
+            match normalize_frontmatter(&content) {
+                Ok(n) => n,
+                Err(e) => {
+                    eprintln!("{}: cannot normalize — {e}", path.display());
+                    return false;
+                }
+            }
+        } else {
+            format_markdown_body(&content, width)
+        }
+    } else {
+        format_markdown_body(&content, width)
+    };
+
+    if formatted != content {
+        if let Err(e) = std::fs::write(path, &formatted) {
+            eprintln!("{}: cannot write — {e}", path.display());
+            return false;
+        }
+        eprintln!("formatted {}", path.display());
+    }
+    true
+}
+
 pub fn normalize_all(root: &std::path::Path) -> bool {
-    let tasks_dir = root.join(".plan");
+    let tasks_dir = root.join(lib::PLAN_DIR);
 
     let entries = match read_task_files(&tasks_dir) {
         Ok(v) => v,
@@ -959,7 +976,7 @@ mod tests {
     fn normalize_preserves_body_text() {
         let input = "---\nstatus: open\ntype: bug\npriority: low\n---\n\n## Notes\nSome text.\n";
         let output = normalize_frontmatter(input).unwrap();
-        assert!(output.contains("## Notes\nSome text."));
+        assert!(output.contains("## Notes\n\nSome text."));
     }
 
     #[test]

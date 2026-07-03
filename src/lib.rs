@@ -15,6 +15,7 @@ pub struct Config {
     pub root: Option<PathBuf>,
     pub editor: Option<String>,
     pub themes_dir: Option<PathBuf>,
+    pub default_view: String,
     pub default_sort: Vec<String>,
     pub kanban_order: Vec<String>,
     pub theme: ThemeConfig,
@@ -60,6 +61,7 @@ impl Default for Config {
             root: None,
             editor: None,
             themes_dir: None,
+            default_view: "list".into(),
             default_sort: vec!["priority".into(), "slug".into()],
             kanban_order: vec![
                 "idea".into(),

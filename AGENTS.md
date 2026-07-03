@@ -72,11 +72,28 @@ Every task lives as a markdown file in `.plan/tasks/<slug>.md` with YAML frontma
 
 ### Task Management Workflow
 
-- **Discover work:** `plan` lists all tasks; `plan -k` groups by status column. Filter with `-s open`, `-a backend`, `-t bug`, etc.
-- **Step back / plan:** `plan -k` to see the full board. Pull items from `backlog` or `idea` when choosing what to work on next.
-- **Sort:** flags without values become sort keys — `plan -a -p` sorts by area then priority. `-h` prints all options.
-- **Create:** copy `.plan/TEMPLATE.md` to `.plan/tasks/<slug>.md`.
+- **Discover work:** `plan` or `plan list` lists all tasks; `plan kanban` (alias `k`) groups by status column. Filter with `-s open`, `-a backend`, `-t bug`, etc.
+- **Step back / plan:** `plan k` to see the full board. Pull items from `backlog` or `idea` when choosing what to work on next.
+- **Sort:** `plan list -S area -S priority` for compound sort.
+- **Create:** `plan add <slug>` (alias `a`). Override defaults with `-s`, `-t`, `-p`, `--area`.
+- **Open:** `plan open <slug>` (alias `o`) opens in `$EDITOR`. Supports fuzzy slug matching — if multiple tasks match, a TUI selector appears.
 - **Update:** update 'status' to reflect status. append progress notes at the bottom (newest first). Do not rewrite history.
 - **Complete:** set `status: done` when finished. Do not delete the file.
-- **Block:** set `status: blocked` and note the blocker in the body.
-- **Validate:** run `plan --lint` to check; `plan --format` to auto-fix. `plan --format PATH` formats a specific file or directory. The precommit hook runs `--format` automatically
+- **Delete:** `plan delete <slug>` (alias `d`) removes the file. Supports fuzzy slug matching.
+- **Validate:** `plan lint` to check; `plan format` to auto-fix. `plan format PATH` formats a specific file or directory. The precommit hook runs `format` automatically.
+
+### Slug matching
+
+`open`, `delete`, and `add` accept a slug-ish query that matches `.plan/*.md` files by:
+1. Exact slug match
+2. Prefix match
+3. Substring match (case-insensitive)
+
+If multiple tasks match, a TUI selector appears (Enter to select, q/Ctrl-C to abort).
+
+### Default view
+
+The default view (`plan` with no subcommand) is configurable via `plan.toml`:
+```toml
+default_view = "kanban"  # or "list" (default)
+```

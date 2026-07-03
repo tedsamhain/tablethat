@@ -51,6 +51,10 @@ struct App<'a> {
     preview_scroll: usize,
     preview_offset: usize,
     preview_width: usize,
+    search_mode: bool,
+    search_query: String,
+    search_hits: Vec<usize>,
+    search_index: usize,
     themes: Vec<lib::theme::ThemeFile>,
     current_theme: usize,
 }
@@ -99,6 +103,10 @@ impl<'a> App<'a> {
             preview_scroll: 0,
             preview_offset: 0,
             preview_width: 80,
+            search_mode: false,
+            search_query: String::new(),
+            search_hits: Vec::new(),
+            search_index: 0,
             themes,
             current_theme: 0,
         };
@@ -225,14 +233,11 @@ pub fn run_tui(
                 Action::OpenEditor => {
                     if let Some((_slug, path)) = app.current_task_path() {
                         ratatui::restore();
-                        let editor = cfg.editor.clone().unwrap_or_else(|| {
-                            std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string())
-                        });
-                        let status = std::process::Command::new(&editor).arg(path).status();
+                        let status = std::process::Command::new("gloss").arg(path).status();
                         if let Ok(s) = status
                             && !s.success()
                         {
-                            eprintln!("{editor} exited with code: {:?}", s.code());
+                            eprintln!("gloss exited with code: {:?}", s.code());
                         }
                         if let Ok(t) = ratatui::try_init() {
                             terminal = t;
@@ -286,8 +291,20 @@ impl App<'_> {
     }
 
     fn render_preview(&mut self, frame: &mut Frame) {
-        let [title_area, body_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
+        let has_search = self.search_mode || !self.search_query.is_empty();
+        let (title_area, body_area, search_area) = if has_search {
+            let [ta, ba, sa] = Layout::vertical([
+                Constraint::Length(1),
+                Constraint::Fill(1),
+                Constraint::Length(1),
+            ])
+            .areas(frame.area());
+            (ta, ba, Some(sa))
+        } else {
+            let [ta, ba] =
+                Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
+            (ta, ba, None)
+        };
         let theme_cfg = self.current_theme_config();
         let theme = theme_from_cfg(&theme_cfg);
         let theme_name = self
@@ -297,7 +314,7 @@ impl App<'_> {
             .unwrap_or("default");
         let title = Line::from(Span::styled(
             format!(
-                " Preview [{}] \u{2014} q/Esc:close  c:theme  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
+                " Preview [{}] \u{2014} q:close  c:theme  e:edit  /:search",
                 theme_name
             ),
             Style::default().fg(Color::DarkGray),
@@ -324,6 +341,32 @@ impl App<'_> {
                 body_area.height,
             ),
         );
+        if let Some(search_area) = search_area {
+            let search_line = if self.search_mode {
+                Line::from(Span::styled(
+                    format!("/{}", self.search_query),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ))
+            } else if self.search_hits.is_empty() {
+                Line::from(Span::styled(
+                    format!("/{} (no matches)", self.search_query),
+                    Style::default().fg(Color::DarkGray),
+                ))
+            } else {
+                Line::from(Span::styled(
+                    format!(
+                        "/{} ({}/{})",
+                        self.search_query,
+                        self.search_index + 1,
+                        self.search_hits.len()
+                    ),
+                    Style::default().fg(Color::DarkGray),
+                ))
+            };
+            frame.render_widget(search_line, search_area);
+        }
     }
 
     fn render_header(
@@ -609,32 +652,63 @@ impl App<'_> {
                     return Ok(Action::None);
                 }
                 match self.mode {
-                    Mode::Preview => match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Browse,
-                        KeyCode::Up | KeyCode::Char('k') => {
-                            self.preview_scroll = self.preview_scroll.saturating_sub(1);
+                    Mode::Preview => {
+                        // Search mode input
+                        if self.search_mode {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.search_mode = false;
+                                }
+                                KeyCode::Enter => {
+                                    self.search_mode = false;
+                                    self.run_preview_search();
+                                }
+                                KeyCode::Backspace => {
+                                    self.search_query.pop();
+                                }
+                                KeyCode::Char(ch) => {
+                                    self.search_query.push(ch);
+                                }
+                                _ => {}
+                            }
+                            return Ok(Action::None);
                         }
-                        KeyCode::Down | KeyCode::Char('j') => {
-                            self.preview_scroll = self.preview_scroll.saturating_add(1);
+
+                        // Normal preview mode
+                        match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Browse,
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                self.preview_scroll = self.preview_scroll.saturating_sub(1);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                self.preview_scroll = self.preview_scroll.saturating_add(1);
+                            }
+                            KeyCode::PageUp => {
+                                self.preview_scroll = self.preview_scroll.saturating_sub(20);
+                            }
+                            KeyCode::PageDown | KeyCode::Char(' ') => {
+                                self.preview_scroll = self.preview_scroll.saturating_add(20);
+                            }
+                            KeyCode::Left | KeyCode::Char('h') => {
+                                self.preview_offset = self.preview_offset.saturating_sub(8);
+                            }
+                            KeyCode::Right | KeyCode::Char('l') => {
+                                self.preview_offset = self.preview_offset.saturating_add(8);
+                            }
+                            KeyCode::Char('e') => return Ok(Action::OpenEditor),
+                            KeyCode::Char('/') => {
+                                self.search_mode = true;
+                                self.search_query.clear();
+                            }
+                            KeyCode::Char('n') => self.search_next(),
+                            KeyCode::Char('N') => self.search_prev(),
+                            KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
+                                return Ok(Action::Quit);
+                            }
+                            KeyCode::Char('c') => self.cycle_theme(),
+                            _ => {}
                         }
-                        KeyCode::PageUp => {
-                            self.preview_scroll = self.preview_scroll.saturating_sub(20);
-                        }
-                        KeyCode::PageDown => {
-                            self.preview_scroll = self.preview_scroll.saturating_add(20);
-                        }
-                        KeyCode::Left | KeyCode::Char('h') => {
-                            self.preview_offset = self.preview_offset.saturating_sub(8);
-                        }
-                        KeyCode::Right | KeyCode::Char('l') => {
-                            self.preview_offset = self.preview_offset.saturating_add(8);
-                        }
-                        KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
-                            return Ok(Action::Quit);
-                        }
-                        KeyCode::Char('c') => self.cycle_theme(),
-                        _ => {}
-                    },
+                    }
                     Mode::Browse => {
                         return Ok(match key.code {
                             KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
@@ -739,8 +813,49 @@ impl App<'_> {
             self.render_content(&content);
             self.preview_scroll = 0;
             self.preview_offset = 0;
+            self.search_mode = false;
+            self.search_query.clear();
+            self.search_hits.clear();
+            self.search_index = 0;
             self.mode = Mode::Preview;
         }
+    }
+
+    fn run_preview_search(&mut self) {
+        self.search_hits.clear();
+        self.search_index = 0;
+        let q = self.search_query.to_lowercase();
+        if q.is_empty() {
+            return;
+        }
+        if let Some((_slug, path)) = self.current_task_path()
+            && let Ok(content) = std::fs::read_to_string(path)
+        {
+            for (i, line) in content.lines().enumerate() {
+                if line.to_lowercase().contains(&q) {
+                    self.search_hits.push(i);
+                }
+            }
+        }
+        if !self.search_hits.is_empty() {
+            self.preview_scroll = self.search_hits[0];
+        }
+    }
+
+    fn search_next(&mut self) {
+        if self.search_hits.is_empty() {
+            return;
+        }
+        self.search_index = (self.search_index + 1) % self.search_hits.len();
+        self.preview_scroll = self.search_hits[self.search_index];
+    }
+
+    fn search_prev(&mut self) {
+        if self.search_hits.is_empty() {
+            return;
+        }
+        self.search_index = self.search_index.wrapping_sub(1) % self.search_hits.len();
+        self.preview_scroll = self.search_hits[self.search_index];
     }
 
     fn current_theme_config(&self) -> lib::ThemeConfig {

@@ -1,0 +1,11 @@
+# Molokai theme — inspired by the classic Vim color scheme
+name = "molokai"
+
+[theme]
+h1_color = "#A6E22E"
+h2_color = "#A6E22E"
+h3_color = "#A6E22E"
+code_color = "#66D9EF"
+code_block_color = "#75715E"
+bold_style = "bold"
+emphasis_style = "dim"

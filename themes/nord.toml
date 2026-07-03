@@ -1,0 +1,11 @@
+# Nord theme — arctic, north-bluish clean palette
+name = "nord"
+
+[theme]
+h1_color = "#88C0D0"
+h2_color = "#88C0D0"
+h3_color = "#88C0D0"
+code_color = "#A3BE8C"
+code_block_color = "#4C566A"
+bold_style = "bold"
+emphasis_style = "dim"

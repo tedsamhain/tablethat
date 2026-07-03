@@ -13,13 +13,14 @@
 # Column order for kanban view
 # kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
 
-# [theme]
-# h1_color = "cyan"
-# h2_color = "cyan"
-# h3_color = "cyan"
-# code_color = "yellow"
-# bold_style = "bold"
-# emphasis_style = "underlined"
+# Theme directory (default: ./themes/)
+# themes_dir = "themes"
+
+# Colors: named (red, green, blue, cyan, magenta, yellow, gray, darkgray, white),
+# light variants (lightred, lightblue, ...), ANSI256 index ("42"), or hex ("#FF8800")
+#
+# Themes are defined in themes/*.toml files, not here.
+# Use `themes_dir` above to change where they're loaded from.
 
 # [colors.status]
 # in_progress = "magenta"

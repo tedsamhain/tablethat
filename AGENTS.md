@@ -34,7 +34,7 @@ No integration test harness exists yet (`tests/` is empty). Tests are inline in 
 
 ```
 src/
-  lib.rs              — Config, parse_color, workspace_root, resolve_file
+  lib.rs              — Config, ThemeConfig, ColorsConfig, parse_color, workspace_root
   markdown.rs         — comrak markdown rendering + formatting
   theme.rs            — theme loading from TOML files
   bin/plan/main.rs    — plan CLI (clap derive)
@@ -52,7 +52,8 @@ Binary mains include sibling modules via `#[path = "../../plan/tasks.rs"]` — n
 - **Rust edition 2024** — requires Rust 1.85+. Check `rustup show` if builds fail on edition.
 - **Clippy**: warnings are denied (`-D warnings`). Avoid `unwrap()` — use `expect()` with a message or proper error handling.
 - **Config layering**: defaults < config file < env vars < CLI flags. Uses `figment` crate. Prefix: `PLAN_` / `GLOSS_`.
-- **Theme files**: `themes/*.toml`. Color values: named strings or ANSI256 decimal numbers.
+- **Themes are separate from config** — loaded from `themes/*.toml`, not from plan.toml. Config only provides `themes_dir` (where to find them) and `colors` (status/priority for kanban).
+- **Theme files**: `themes/*.toml`. Color values: named strings, ANSI256 decimal, or hex (`#FF8800`). Fields: `h1_color`, `h2_color`, `h3_color`, `code_color`, `code_block_color`, `bold_style`, `emphasis_style`.
 - **Task files**: markdown in `.plan/` with YAML frontmatter, see **Task Management** below
 
 ## Task Management (.plan)

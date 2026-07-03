@@ -1,0 +1,11 @@
+# Codesam theme — orange/brown headlines, green code
+name = "codesam"
+
+[theme]
+h1_color = "#D06020"
+h2_color = "#D06020"
+h3_color = "#D06020"
+code_color = "#5CFF5C"
+code_block_color = "#6ECB6E"
+bold_style = "bold"
+emphasis_style = "dim"

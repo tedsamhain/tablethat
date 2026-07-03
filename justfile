@@ -23,9 +23,13 @@ test:
 build:
     cargo build
 
-# Install plan and gloss binaries to ~/.cargo/bin
+# Install plan and gloss binaries to ~/.cargo/bin, themes to platform config
 install:
     cargo install --path .
+    @mkdir -p ~/.config/plan/themes ~/.config/gloss/themes
+    @cp themes/*.toml ~/.config/plan/themes/
+    @cp themes/*.toml ~/.config/gloss/themes/
+    @echo "Installed themes to ~/.config/plan/themes/ and ~/.config/gloss/themes/"
 
 # cargo build (release)
 build-release:

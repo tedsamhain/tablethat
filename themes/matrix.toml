@@ -1,0 +1,11 @@
+# Matrix theme — authentic digital rain CRT phosphor green
+name = "matrix"
+
+[theme]
+h1_color = "#00FF41"
+h2_color = "#00CC33"
+h3_color = "#00CC33"
+code_color = "#00FF41"
+code_block_color = "#008811"
+bold_style = "bold"
+emphasis_style = "dim"

@@ -1,0 +1,11 @@
+# Matrix 2 theme — cyan headlines, green code
+name = "matrix2"
+
+[theme]
+h1_color = "#00FFFF"
+h2_color = "#00FFFF"
+h3_color = "#00CDCD"
+code_color = "#39FF14"
+code_block_color = "#5CB85C"
+bold_style = "bold"
+emphasis_style = "dim"

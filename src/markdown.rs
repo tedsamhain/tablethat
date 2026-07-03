@@ -13,6 +13,7 @@ pub struct MarkdownTheme {
     pub bold: Style,
     pub dim: Style,
     pub code: Style,
+    pub code_block: Style,
 }
 
 pub fn theme_from_cfg(cfg: &ThemeConfig) -> MarkdownTheme {
@@ -33,15 +34,18 @@ pub fn theme_from_cfg(cfg: &ThemeConfig) -> MarkdownTheme {
 
     MarkdownTheme {
         h1: Style::default()
-            .fg(crate::parse_ratatui_color(&cfg.h1_color))
+            .fg(cfg.h1_color)
             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
         h2: Style::default()
-            .fg(crate::parse_ratatui_color(&cfg.h2_color))
+            .fg(cfg.h2_color)
             .add_modifier(Modifier::UNDERLINED),
-        h3: Style::default().fg(crate::parse_ratatui_color(&cfg.h3_color)),
+        h3: Style::default()
+            .fg(cfg.h3_color)
+            .add_modifier(Modifier::UNDERLINED),
         bold: Style::default().add_modifier(bold_mod),
         dim: Style::default().add_modifier(emphasis_mod),
-        code: Style::default().fg(crate::parse_ratatui_color(&cfg.code_color)),
+        code: Style::default().fg(cfg.code_color),
+        code_block: Style::default().fg(cfg.code_block_color),
     }
 }
 
@@ -458,7 +462,7 @@ fn render_node(
         NodeValue::CodeBlock(code_block) => {
             let NodeCodeBlock { literal, .. } = code_block.as_ref();
             for line in literal.lines() {
-                lines.push(Line::from(line.to_string()));
+                lines.push(Line::from(Span::styled(line.to_string(), th.code_block)));
             }
             lines.push(Line::from(""));
         }

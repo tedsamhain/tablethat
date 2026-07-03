@@ -5,6 +5,7 @@ use figment::{
     Figment,
     providers::{Env, Format, Serialized, Toml},
 };
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -18,18 +19,23 @@ pub struct Config {
     pub default_view: String,
     pub default_sort: Vec<String>,
     pub kanban_order: Vec<String>,
-    pub theme: ThemeConfig,
     pub colors: ColorsConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ThemeConfig {
-    pub h1_color: String,
-    pub h2_color: String,
-    pub h3_color: String,
-    pub code_color: String,
+    pub h1_color: Color,
+    pub h2_color: Color,
+    pub h3_color: Color,
+    pub code_color: Color,
+    #[serde(default = "default_code_block_color")]
+    pub code_block_color: Color,
     pub bold_style: String,
     pub emphasis_style: String,
+}
+
+fn default_code_block_color() -> Color {
+    Color::Yellow
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -40,19 +46,19 @@ pub struct ColorsConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StatusColors {
-    pub in_progress: String,
-    pub open: String,
-    pub blocked: String,
-    pub backlog: String,
-    pub idea: String,
-    pub done: String,
+    pub in_progress: Color,
+    pub open: Color,
+    pub blocked: Color,
+    pub backlog: Color,
+    pub idea: Color,
+    pub done: Color,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PriorityColors {
-    pub high: String,
-    pub medium: String,
-    pub low: String,
+    pub high: Color,
+    pub medium: Color,
+    pub low: Color,
 }
 
 impl Default for Config {
@@ -71,7 +77,6 @@ impl Default for Config {
                 "blocked".into(),
                 "done".into(),
             ],
-            theme: ThemeConfig::default(),
             colors: ColorsConfig::default(),
         }
     }
@@ -80,10 +85,11 @@ impl Default for Config {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
-            h1_color: "cyan".into(),
-            h2_color: "cyan".into(),
-            h3_color: "cyan".into(),
-            code_color: "yellow".into(),
+            h1_color: Color::Cyan,
+            h2_color: Color::Cyan,
+            h3_color: Color::Cyan,
+            code_color: Color::Yellow,
+            code_block_color: Color::Yellow,
             bold_style: "bold".into(),
             emphasis_style: "underlined".into(),
         }
@@ -93,12 +99,12 @@ impl Default for ThemeConfig {
 impl Default for StatusColors {
     fn default() -> Self {
         Self {
-            in_progress: "magenta".into(),
-            open: "yellow".into(),
-            blocked: "red".into(),
-            backlog: "blue".into(),
-            idea: "cyan".into(),
-            done: "green".into(),
+            in_progress: Color::Magenta,
+            open: Color::Yellow,
+            blocked: Color::Red,
+            backlog: Color::Blue,
+            idea: Color::Cyan,
+            done: Color::Green,
         }
     }
 }
@@ -106,9 +112,9 @@ impl Default for StatusColors {
 impl Default for PriorityColors {
     fn default() -> Self {
         Self {
-            high: "red".into(),
-            medium: "yellow".into(),
-            low: "darkgray".into(),
+            high: Color::Red,
+            medium: Color::Yellow,
+            low: Color::DarkGray,
         }
     }
 }
@@ -203,7 +209,7 @@ pub fn parse_color(s: &str) -> termcolor::Color {
         "blue" => termcolor::Color::Blue,
         "magenta" => termcolor::Color::Magenta,
         "cyan" => termcolor::Color::Cyan,
-        "gray" | "grey" => termcolor::Color::White,
+        "gray" | "grey" => termcolor::Color::Ansi256(7),
         "darkgray" | "darkgrey" => termcolor::Color::Ansi256(8),
         "white" => termcolor::Color::White,
         _ => {
@@ -216,27 +222,36 @@ pub fn parse_color(s: &str) -> termcolor::Color {
     }
 }
 
-/// Parse a color name string into a ratatui Color.
-pub fn parse_ratatui_color(s: &str) -> ratatui::style::Color {
-    match s.to_lowercase().as_str() {
-        "black" => ratatui::style::Color::Black,
-        "red" => ratatui::style::Color::Red,
-        "green" => ratatui::style::Color::Green,
-        "yellow" => ratatui::style::Color::Yellow,
-        "blue" => ratatui::style::Color::Blue,
-        "magenta" => ratatui::style::Color::Magenta,
-        "cyan" => ratatui::style::Color::Cyan,
-        "gray" | "grey" => ratatui::style::Color::Gray,
-        "darkgray" | "darkgrey" => ratatui::style::Color::DarkGray,
-        "white" => ratatui::style::Color::White,
-        _ => {
-            if let Ok(n) = s.parse::<u8>() {
-                ratatui::style::Color::Indexed(n)
-            } else {
-                ratatui::style::Color::White
-            }
-        }
+/// Convert a ratatui Color to a termcolor Color.
+pub fn ratatui_to_termcolor(c: Color) -> termcolor::Color {
+    match c {
+        Color::Black => termcolor::Color::Black,
+        Color::Red => termcolor::Color::Red,
+        Color::Green => termcolor::Color::Green,
+        Color::Yellow => termcolor::Color::Yellow,
+        Color::Blue => termcolor::Color::Blue,
+        Color::Magenta => termcolor::Color::Magenta,
+        Color::Cyan => termcolor::Color::Cyan,
+        Color::Gray => termcolor::Color::Ansi256(7),
+        Color::DarkGray => termcolor::Color::Ansi256(8),
+        Color::White => termcolor::Color::White,
+        Color::LightRed => termcolor::Color::Ansi256(9),
+        Color::LightGreen => termcolor::Color::Ansi256(10),
+        Color::LightYellow => termcolor::Color::Ansi256(11),
+        Color::LightBlue => termcolor::Color::Ansi256(12),
+        Color::LightMagenta => termcolor::Color::Ansi256(13),
+        Color::LightCyan => termcolor::Color::Ansi256(14),
+        Color::Indexed(n) => termcolor::Color::Ansi256(n),
+        Color::Rgb(r, g, b) => termcolor::Color::Ansi256(rgb_to_ansi256(r, g, b)),
+        _ => termcolor::Color::White,
     }
+}
+
+fn rgb_to_ansi256(r: u8, g: u8, b: u8) -> u8 {
+    let ri = (r as u16 * 5 / 255) as u8;
+    let gi = (g as u16 * 5 / 255) as u8;
+    let bi = (b as u16 * 5 / 255) as u8;
+    16 + 36 * ri + 6 * gi + bi
 }
 
 pub fn workspace_root() -> PathBuf {

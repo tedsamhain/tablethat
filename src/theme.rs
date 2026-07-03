@@ -60,3 +60,51 @@ pub fn load_themes(themes_dir: Option<&Path>, app_name: &str) -> Vec<ThemeFile> 
 
     themes
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_themes_from_dir() {
+        let themes = load_themes(Some(Path::new("themes")), "plan");
+        assert!(
+            !themes.is_empty(),
+            "should find themes in themes/ directory"
+        );
+        // Should find at least the built-in themes
+        assert!(
+            themes.len() >= 10,
+            "expected at least 10 themes, got {}",
+            themes.len()
+        );
+    }
+
+    #[test]
+    fn load_themes_includes_default() {
+        let themes = load_themes(Some(Path::new("themes")), "plan");
+        let has_default = themes.iter().any(|t| t.name == "default");
+        assert!(has_default, "should include default theme");
+    }
+
+    #[test]
+    fn load_themes_fallback_to_default() {
+        let themes = load_themes(Some(Path::new("/nonexistent/path")), "plan");
+        assert_eq!(themes.len(), 1);
+        assert_eq!(themes[0].name, "default");
+    }
+
+    #[test]
+    fn theme_file_has_required_fields() {
+        let themes = load_themes(Some(Path::new("themes")), "plan");
+        for theme in &themes {
+            assert!(!theme.name.is_empty(), "theme name should not be empty");
+            // All themes should have valid colors (they deserialize via ratatui Color)
+            let _ = theme.theme.h1_color;
+            let _ = theme.theme.h2_color;
+            let _ = theme.theme.h3_color;
+            let _ = theme.theme.code_color;
+            let _ = theme.theme.code_block_color;
+        }
+    }
+}

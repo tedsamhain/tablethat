@@ -269,3 +269,123 @@ pub fn priority_color(priority: &str, colors: &ColorsConfig) -> ratatui::style::
         _ => Color::White,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_default_values() {
+        let cfg = Config::default();
+        assert_eq!(cfg.default_view, "list");
+        assert_eq!(cfg.width, 80);
+        assert_eq!(cfg.tui_width, 80);
+        assert_eq!(cfg.pager_width, 100);
+        assert!(cfg.root.is_none());
+        assert!(cfg.editor.is_none());
+    }
+
+    #[test]
+    fn config_default_sort() {
+        let cfg = Config::default();
+        assert_eq!(cfg.default_sort, vec!["priority", "slug"]);
+    }
+
+    #[test]
+    fn config_default_kanban_order() {
+        let cfg = Config::default();
+        assert_eq!(
+            cfg.kanban_order,
+            vec!["idea", "backlog", "open", "in-progress", "blocked", "done"]
+        );
+    }
+
+    #[test]
+    fn ratatui_to_termcolor_basic_colors() {
+        assert_eq!(ratatui_to_termcolor(Color::Red), termcolor::Color::Red);
+        assert_eq!(ratatui_to_termcolor(Color::Green), termcolor::Color::Green);
+        assert_eq!(ratatui_to_termcolor(Color::Blue), termcolor::Color::Blue);
+        assert_eq!(
+            ratatui_to_termcolor(Color::Yellow),
+            termcolor::Color::Yellow
+        );
+        assert_eq!(ratatui_to_termcolor(Color::Cyan), termcolor::Color::Cyan);
+        assert_eq!(
+            ratatui_to_termcolor(Color::Magenta),
+            termcolor::Color::Magenta
+        );
+        assert_eq!(ratatui_to_termcolor(Color::Black), termcolor::Color::Black);
+        assert_eq!(ratatui_to_termcolor(Color::White), termcolor::Color::White);
+    }
+
+    #[test]
+    fn ratatui_to_termcolor_gray() {
+        assert_eq!(
+            ratatui_to_termcolor(Color::Gray),
+            termcolor::Color::Ansi256(7)
+        );
+        assert_eq!(
+            ratatui_to_termcolor(Color::DarkGray),
+            termcolor::Color::Ansi256(8)
+        );
+    }
+
+    #[test]
+    fn ratatui_to_termcolor_indexed() {
+        assert_eq!(
+            ratatui_to_termcolor(Color::Indexed(42)),
+            termcolor::Color::Ansi256(42)
+        );
+        assert_eq!(
+            ratatui_to_termcolor(Color::Indexed(0)),
+            termcolor::Color::Ansi256(0)
+        );
+        assert_eq!(
+            ratatui_to_termcolor(Color::Indexed(255)),
+            termcolor::Color::Ansi256(255)
+        );
+    }
+
+    #[test]
+    fn ratatui_to_termcolor_rgb() {
+        // RGB should convert to an ANSI256 index
+        let result = ratatui_to_termcolor(Color::Rgb(255, 0, 0));
+        match result {
+            termcolor::Color::Ansi256(_) => {} // expected
+            _ => panic!("expected Ansi256, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn status_color_maps_correctly() {
+        let colors = ColorsConfig::default();
+        assert_eq!(status_color("open", &colors), Color::Yellow);
+        assert_eq!(status_color("in-progress", &colors), Color::Magenta);
+        assert_eq!(status_color("blocked", &colors), Color::Red);
+        assert_eq!(status_color("backlog", &colors), Color::Blue);
+        assert_eq!(status_color("idea", &colors), Color::Cyan);
+        assert_eq!(status_color("done", &colors), Color::Green);
+        assert_eq!(status_color("unknown", &colors), Color::White);
+    }
+
+    #[test]
+    fn priority_color_maps_correctly() {
+        let colors = ColorsConfig::default();
+        assert_eq!(priority_color("high", &colors), Color::Red);
+        assert_eq!(priority_color("medium", &colors), Color::Yellow);
+        assert_eq!(priority_color("low", &colors), Color::DarkGray);
+        assert_eq!(priority_color("unknown", &colors), Color::White);
+    }
+
+    #[test]
+    fn theme_config_defaults() {
+        let theme = ThemeConfig::default();
+        assert_eq!(theme.h1_color, Color::Cyan);
+        assert_eq!(theme.h2_color, Color::Cyan);
+        assert_eq!(theme.h3_color, Color::Cyan);
+        assert_eq!(theme.code_color, Color::Yellow);
+        assert_eq!(theme.code_block_color, Color::Yellow);
+        assert_eq!(theme.bold_style, "bold");
+        assert_eq!(theme.emphasis_style, "underlined");
+    }
+}

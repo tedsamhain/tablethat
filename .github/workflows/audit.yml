@@ -21,13 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install just
+      - name: Install tools
         uses: taiki-e/install-action@v2
         with:
-          tool: just
+          tool: just,cargo-audit,cargo-deny
 
-      - name: Install audit tools
-        run: cargo install cargo-audit cargo-deny
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Run audits
         run: just audit

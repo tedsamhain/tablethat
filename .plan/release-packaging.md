@@ -1,5 +1,5 @@
 ---
-status: open
+status: done
 type: chore
 priority: high
 area: devops

@@ -452,7 +452,7 @@ fn render_node(
 
             let content = item_text.trim();
             let check_mark = if checked { "[x]" } else { "[ ]" };
-            let prefix = format!("  {} ", check_mark);
+            let prefix = format!("  - {} ", check_mark);
             let indent_sz = prefix.len();
             let first = format!("{}{}", prefix, content);
             let indent = " ".repeat(indent_sz);

@@ -99,7 +99,7 @@ code_block_color = "yellow"
 
 Color values: named (`red`, `green`, `blue`, `cyan`, `magenta`, `yellow`, `gray`, `darkgray`, `white`, `lightred`, ...), ANSI256 decimal (`42`), or hex (`#FF8800`).
 
-Included themes: `default`, `matrix`, `matrix2`, `codesam`, `morning`, `dracula`, `nord`, `molokai`, `solarized`, `solarized-dark`, `warm`, `mono`.
+Included themes: `default`, `matrix`, `matrix2`, `codesam`, `codesam2`, `morning`, `dracula`, `nord`, `molokai`, `solarized`, `solarized-dark`, `warm`, `mono`.
 
 ## Integration with AI agents
 

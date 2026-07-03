@@ -262,7 +262,7 @@ fn run_tui(app: &mut App, cfg: &lib::Config) {
                     let editor = std::env::var("EDITOR")
                         .ok()
                         .filter(|e| !e.is_empty())
-                        .unwrap_or_else(|| "sensible-editor".to_string());
+                        .unwrap_or_else(|| "vi".to_string());
                     ratatui::restore();
                     let _ = std::process::Command::new(&editor).arg(&path).status();
                     app.load_selected();

@@ -374,26 +374,11 @@ macro_rules! write_colored {
 }
 
 fn status_color(status: &str, colors: &ColorsConfig) -> Color {
-    let c = match status {
-        "in-progress" => colors.status.in_progress,
-        "open" => colors.status.open,
-        "blocked" => colors.status.blocked,
-        "backlog" => colors.status.backlog,
-        "idea" => colors.status.idea,
-        "done" => colors.status.done,
-        _ => return Color::White,
-    };
-    lib::ratatui_to_termcolor(c)
+    lib::ratatui_to_termcolor(lib::status_color(status, colors))
 }
 
 fn priority_color(p: &str, colors: &ColorsConfig) -> Color {
-    let c = match p {
-        "high" => colors.priority.high,
-        "medium" => colors.priority.medium,
-        "low" => colors.priority.low,
-        _ => return Color::White,
-    };
-    lib::ratatui_to_termcolor(c)
+    lib::ratatui_to_termcolor(lib::priority_color(p, colors))
 }
 
 fn status_label(status: &str) -> &str {

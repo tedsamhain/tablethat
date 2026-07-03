@@ -205,29 +205,6 @@ pub fn resolve_file(
     None
 }
 
-/// Parse a color name string into a termcolor Color.
-pub fn parse_color(s: &str) -> termcolor::Color {
-    match s.to_lowercase().as_str() {
-        "black" => termcolor::Color::Black,
-        "red" => termcolor::Color::Red,
-        "green" => termcolor::Color::Green,
-        "yellow" => termcolor::Color::Yellow,
-        "blue" => termcolor::Color::Blue,
-        "magenta" => termcolor::Color::Magenta,
-        "cyan" => termcolor::Color::Cyan,
-        "gray" | "grey" => termcolor::Color::Ansi256(7),
-        "darkgray" | "darkgrey" => termcolor::Color::Ansi256(8),
-        "white" => termcolor::Color::White,
-        _ => {
-            if let Ok(n) = s.parse::<u8>() {
-                termcolor::Color::Ansi256(n)
-            } else {
-                termcolor::Color::White
-            }
-        }
-    }
-}
-
 /// Convert a ratatui Color to a termcolor Color.
 pub fn ratatui_to_termcolor(c: Color) -> termcolor::Color {
     match c {
@@ -270,4 +247,25 @@ pub fn workspace_root() -> PathBuf {
         candidate = path.parent();
     }
     dir
+}
+
+pub fn status_color(status: &str, colors: &ColorsConfig) -> ratatui::style::Color {
+    match status {
+        "in-progress" => colors.status.in_progress,
+        "open" => colors.status.open,
+        "blocked" => colors.status.blocked,
+        "backlog" => colors.status.backlog,
+        "idea" => colors.status.idea,
+        "done" => colors.status.done,
+        _ => Color::White,
+    }
+}
+
+pub fn priority_color(priority: &str, colors: &ColorsConfig) -> ratatui::style::Color {
+    match priority {
+        "high" => colors.priority.high,
+        "medium" => colors.priority.medium,
+        "low" => colors.priority.low,
+        _ => Color::White,
+    }
 }

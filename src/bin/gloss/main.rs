@@ -80,17 +80,6 @@ fn main() {
     }
 }
 
-#[cfg(unix)]
 fn is_tty() -> bool {
-    unsafe {
-        unsafe extern "C" {
-            fn isatty(fd: i32) -> i32;
-        }
-        isatty(0) != 0
-    }
-}
-
-#[cfg(not(unix))]
-fn is_tty() -> bool {
-    true
+    std::io::IsTerminal::is_terminal(&std::io::stdin())
 }

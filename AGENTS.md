@@ -58,7 +58,7 @@ Binary mains include sibling modules via `#[path = "../../plan/tasks.rs"]` — n
 
 ## Task Management (.plan)
 
-Every task lives as a markdown file in `.plan/tasks/<slug>.md` with YAML frontmatter. The filename (without `.md`) is the unique key — no numeric ID needed.
+Every task lives as a markdown file in `.plan/<slug>.md` with YAML frontmatter. The filename (without `.md`) is the unique key — no numeric ID needed.
 
 ### Status lifecycle
 

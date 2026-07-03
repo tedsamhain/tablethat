@@ -258,7 +258,7 @@ pub fn run_tui(
                         let editor = std::env::var("EDITOR")
                             .ok()
                             .filter(|e| !e.is_empty())
-                            .unwrap_or_else(|| "sensible-editor".to_string());
+                            .unwrap_or_else(|| "vi".to_string());
                         ratatui::restore();
                         let status = std::process::Command::new(&editor).arg(path).status();
                         if let Ok(s) = status
@@ -843,23 +843,6 @@ impl App<'_> {
         }
     }
 
-    #[allow(dead_code)]
-    fn open_preview(&mut self) {
-        if let Some((_slug, path)) = self.current_task_path()
-            && let Ok(content) = std::fs::read_to_string(path)
-        {
-            self.current_theme = 0;
-            self.render_content(&content);
-            self.preview_scroll = 0;
-            self.preview_offset = 0;
-            self.search_mode = false;
-            self.search_query.clear();
-            self.search_hits.clear();
-            self.search_index = 0;
-            self.mode = Mode::Preview;
-        }
-    }
-
     fn run_preview_search(&mut self) {
         self.search_hits.clear();
         self.search_index = 0;
@@ -931,24 +914,11 @@ impl App<'_> {
 }
 
 fn status_color(status: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
-    match status {
-        "in-progress" => colors.status.in_progress,
-        "open" => colors.status.open,
-        "blocked" => colors.status.blocked,
-        "backlog" => colors.status.backlog,
-        "idea" => colors.status.idea,
-        "done" => colors.status.done,
-        _ => Color::White,
-    }
+    lib::status_color(status, colors)
 }
 
 fn priority_color(p: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
-    match p {
-        "high" => colors.priority.high,
-        "medium" => colors.priority.medium,
-        "low" => colors.priority.low,
-        _ => Color::White,
-    }
+    lib::priority_color(p, colors)
 }
 
 #[cfg(test)]

@@ -27,17 +27,5 @@ pub fn run_filter(theme: &ThemeFile, no_color: bool) {
 }
 
 fn atty_check() -> bool {
-    #[cfg(unix)]
-    {
-        unsafe {
-            unsafe extern "C" {
-                fn isatty(fd: i32) -> i32;
-            }
-            isatty(1) != 0
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
+    std::io::IsTerminal::is_terminal(&std::io::stdout())
 }

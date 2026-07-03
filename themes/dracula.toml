@@ -1,0 +1,11 @@
+# Dracula theme — popular dark theme with purple/pink accents
+name = "dracula"
+
+[theme]
+h1_color = "#BD93F9"
+h2_color = "#BD93F9"
+h3_color = "#BD93F9"
+code_color = "#FF79C6"
+code_block_color = "#6272A4"
+bold_style = "bold"
+emphasis_style = "dim"

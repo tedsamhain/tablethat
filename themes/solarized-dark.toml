@@ -1,0 +1,11 @@
+# Solarized Dark theme — based on Ethan Schoonover's palette
+name = "solarized-dark"
+
+[theme]
+h1_color = "#CB4B16"
+h2_color = "#CB4B16"
+h3_color = "#CB4B16"
+code_color = "#2AA198"
+code_block_color = "#586E75"
+bold_style = "bold"
+emphasis_style = "dim"

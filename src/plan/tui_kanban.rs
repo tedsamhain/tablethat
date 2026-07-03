@@ -747,7 +747,7 @@ impl App<'_> {
         self.themes
             .get(self.current_theme)
             .map(|t| t.theme.clone())
-            .unwrap_or_else(|| self.cfg.theme.clone())
+            .unwrap_or_default()
     }
 
     fn cycle_theme(&mut self) {
@@ -777,24 +777,24 @@ impl App<'_> {
 }
 
 fn status_color(status: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
-    lib::parse_ratatui_color(match status {
-        "in-progress" => &colors.status.in_progress,
-        "open" => &colors.status.open,
-        "blocked" => &colors.status.blocked,
-        "backlog" => &colors.status.backlog,
-        "idea" => &colors.status.idea,
-        "done" => &colors.status.done,
-        _ => return Color::White,
-    })
+    match status {
+        "in-progress" => colors.status.in_progress,
+        "open" => colors.status.open,
+        "blocked" => colors.status.blocked,
+        "backlog" => colors.status.backlog,
+        "idea" => colors.status.idea,
+        "done" => colors.status.done,
+        _ => Color::White,
+    }
 }
 
 fn priority_color(p: &str, colors: &tablethat_lib::ColorsConfig) -> Color {
-    lib::parse_ratatui_color(match p {
-        "high" => &colors.priority.high,
-        "medium" => &colors.priority.medium,
-        "low" => &colors.priority.low,
-        _ => return Color::White,
-    })
+    match p {
+        "high" => colors.priority.high,
+        "medium" => colors.priority.medium,
+        "low" => colors.priority.low,
+        _ => Color::White,
+    }
 }
 
 #[cfg(test)]

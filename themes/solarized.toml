@@ -1,0 +1,11 @@
+# Solarized theme — Ethan Schoonover's balanced light palette
+name = "solarized"
+
+[theme]
+h1_color = "#CB4B16"
+h2_color = "#CB4B16"
+h3_color = "#CB4B16"
+code_color = "#2AA198"
+code_block_color = "#93A1A1"
+bold_style = "bold"
+emphasis_style = "dim"

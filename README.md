@@ -8,11 +8,16 @@
 
 Task management with kanban TUI. Tasks live in `.plan/*.md` as markdown files with YAML frontmatter.
 
-    plan                    # list tasks
-    plan -k                 # kanban view
+    plan                    # list tasks (default)
+    plan list               # list tasks
+    plan kanban             # kanban view (alias: k)
+    plan add <slug>         # create a task (alias: a)
+    plan open <slug>        # open in $EDITOR (alias: o)
+    plan delete <slug>      # delete a task (alias: d)
     plan tui                # interactive TUI
-    plan --lint             # validate frontmatter
-    plan --init             # scaffold .plan/ directory
+    plan init               # scaffold .plan/ directory
+    plan lint               # validate frontmatter
+    plan format [PATH]      # format markdown
 
 ### gloss
 
@@ -51,14 +56,15 @@ area: backend
 Description and context.
 ```
 
-**Status:** `idea` · `backlog` · `open` · `in-progress` · `blocked` · `done` **Type:** `bug` · `feature` ·
-`chore` · `decision` · `perf` **Priority:** `high` · `medium` · `low`
+**Status:** `idea` · `backlog` · `open` · `in-progress` · `blocked` · `done`
+**Type:** `bug` · `feature` · `chore` · `decision` · `perf`
+**Priority:** `high` · `medium` · `low`
 
 Validation uses `.plan/.schema.json` (project-local), or falls back to `~/.config/plan/schema.json`.
 
 ## Configuration
 
-Both tools use layered configuration: **defaults \< config file \< env vars \< CLI flags**.
+Both tools use layered configuration: **defaults < config file < env vars < CLI flags**.
 
 ### plan
 
@@ -84,11 +90,16 @@ Theme TOML files in `themes/` directory. Cycle with `c` in preview mode.
 name = "my-theme"
 
 [theme]
-h1_color = "green"
-code_color = "magenta"
+h1_color = "#FF8800"
+h2_color = "#FF8800"
+h3_color = "#FF8800"
+code_color = "cyan"
+code_block_color = "yellow"
 ```
 
-Color values: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `darkgray`, `white`, or ANSI256 decimal.
+Color values: named (`red`, `green`, `blue`, `cyan`, `magenta`, `yellow`, `gray`, `darkgray`, `white`, `lightred`, ...), ANSI256 decimal (`42`), or hex (`#FF8800`).
+
+Included themes: `default`, `matrix`, `matrix2`, `codesam`, `morning`, `dracula`, `nord`, `molokai`, `solarized`, `solarized-dark`, `warm`, `mono`.
 
 ## Integration with AI agents
 
@@ -97,7 +108,7 @@ discoveries:
 
 1. Agent encounters something tangential during a task
 2. Agent creates a task file in `.plan/`
-3. Human reviews with `plan -k` or `plan tui`
+3. Human reviews with `plan kanban` or `plan tui`
 
 ## License
 

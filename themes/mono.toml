@@ -1,10 +1,11 @@
-# Monochrome theme — no color, structure only
+# Monochrome theme — no color, terminal defaults only
 name = "mono"
 
 [theme]
-h1_color = "white"
-h2_color = "white"
-h3_color = "white"
-code_color = "gray"
+h1_color = "reset"
+h2_color = "reset"
+h3_color = "reset"
+code_color = "reset"
+code_block_color = "reset"
 bold_style = "bold"
 emphasis_style = "dim"

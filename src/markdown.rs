@@ -514,7 +514,15 @@ pub fn format_commonmark(text: &str, width: usize) -> String {
     opts.render.width = width;
     opts.render.prefer_fenced = true;
     let formatted = comrak::markdown_to_commonmark(text, &opts);
-    align_tables(&formatted)
+    let aligned = align_tables(&formatted);
+    strip_trailing_whitespace(&aligned)
+}
+
+fn strip_trailing_whitespace(text: &str) -> String {
+    text.lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn align_tables(text: &str) -> String {

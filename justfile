@@ -31,6 +31,12 @@ install:
     @cp themes/*.toml ~/.config/gloss/themes/
     @echo "Installed themes to ~/.config/plan/themes/ and ~/.config/gloss/themes/"
 
+# Uninstall binaries and remove copied themes
+uninstall:
+    cargo uninstall -p tablethat
+    @rm -f ~/.config/plan/themes/*.toml ~/.config/gloss/themes/*.toml
+    @echo "Removed binaries and themes"
+
 # cargo build (release)
 build-release:
     cargo build --release

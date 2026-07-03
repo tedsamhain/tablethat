@@ -21,6 +21,7 @@ pub enum Action {
     None,
     Quit,
     OpenEditor,
+    OpenGloss,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -102,7 +103,7 @@ impl<'a> App<'a> {
             preview: Vec::new(),
             preview_scroll: 0,
             preview_offset: 0,
-            preview_width: 80,
+            preview_width: cfg.tui_width,
             search_mode: false,
             search_query: String::new(),
             search_hits: Vec::new(),
@@ -230,14 +231,40 @@ pub fn run_tui(
             Ok(action) => match action {
                 Action::None => {}
                 Action::Quit => break,
-                Action::OpenEditor => {
+                Action::OpenGloss => {
                     if let Some((_slug, path)) = app.current_task_path() {
                         ratatui::restore();
-                        let status = std::process::Command::new("gloss").arg(path).status();
+                        let width = app.cfg.pager_width.to_string();
+                        let status = std::process::Command::new("gloss")
+                            .arg("--width")
+                            .arg(&width)
+                            .arg(path)
+                            .status();
                         if let Ok(s) = status
                             && !s.success()
                         {
                             eprintln!("gloss exited with code: {:?}", s.code());
+                        }
+                        if let Ok(t) = ratatui::try_init() {
+                            terminal = t;
+                        } else {
+                            eprintln!("failed to re-init terminal after gloss");
+                            break;
+                        }
+                    }
+                }
+                Action::OpenEditor => {
+                    if let Some((_slug, path)) = app.current_task_path() {
+                        let editor = std::env::var("EDITOR")
+                            .ok()
+                            .filter(|e| !e.is_empty())
+                            .unwrap_or_else(|| "sensible-editor".to_string());
+                        ratatui::restore();
+                        let status = std::process::Command::new(&editor).arg(path).status();
+                        if let Ok(s) = status
+                            && !s.success()
+                        {
+                            eprintln!("{editor} exited with code: {:?}", s.code());
                         }
                         if let Ok(t) = ratatui::try_init() {
                             terminal = t;
@@ -314,13 +341,13 @@ impl App<'_> {
             .unwrap_or("default");
         let title = Line::from(Span::styled(
             format!(
-                " Preview [{}] \u{2014} q:close  c:theme  e:edit  /:search",
+                " Preview [{}] \u{2014} q:close  c:theme  e:editor  /:search",
                 theme_name
             ),
             Style::default().fg(Color::DarkGray),
         ));
         frame.render_widget(title, title_area);
-        let tw = ((body_area.width.saturating_sub(1) as f64 * 0.9) as u16).clamp(40, 120) as usize;
+        let tw = self.cfg.tui_width;
         if tw != self.preview_width
             && self.mode == Mode::Preview
             && let Some((_slug, path)) = self.current_task_path()
@@ -606,7 +633,7 @@ impl App<'_> {
 
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
         let text = format!(
-            " Enter:preview  f:filter  e:edit  {}  Ctrl-c:quit ",
+            " Enter:view  f:filter  e:edit  {}  Ctrl-c:quit ",
             if self.has_active_filters() {
                 "q:clear-filters"
             } else {
@@ -727,10 +754,7 @@ impl App<'_> {
                                     Action::Quit
                                 }
                             }
-                            KeyCode::Enter if !self.columns.is_empty() => {
-                                self.open_preview();
-                                Action::None
-                            }
+                            KeyCode::Enter if !self.columns.is_empty() => Action::OpenGloss,
                             KeyCode::Char('f') if !self.columns.is_empty() => {
                                 let col = &self.columns[self.selected_column];
                                 if let Some(&task_idx) = col.task_indices.get(self.selected_task) {
@@ -805,6 +829,7 @@ impl App<'_> {
         }
     }
 
+    #[allow(dead_code)]
     fn open_preview(&mut self) {
         if let Some((_slug, path)) = self.current_task_path()
             && let Ok(content) = std::fs::read_to_string(path)

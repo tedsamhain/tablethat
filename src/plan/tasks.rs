@@ -833,8 +833,10 @@ pub fn create_task(
     true
 }
 
-pub fn open_task(path: &std::path::Path) -> bool {
+pub fn open_task(path: &std::path::Path, width: usize) -> bool {
     let status = std::process::Command::new("gloss")
+        .arg("--width")
+        .arg(width.to_string())
         .arg(path)
         .status()
         .expect("failed to launch gloss");

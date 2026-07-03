@@ -13,6 +13,15 @@
 # Column order for kanban view
 # kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
 
+# Wrap width for markdown rendering (default: 80)
+# width = 80
+
+# Wrap width for kanban TUI preview (default: 80)
+# tui_width = 80
+
+# Wrap width when opening in gloss pager (default: 120, passed on best effort)
+# pager_width = 120
+
 # Theme directory (default: ./themes/)
 # themes_dir = "themes"
 

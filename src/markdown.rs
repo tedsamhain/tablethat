@@ -39,9 +39,7 @@ pub fn theme_from_cfg(cfg: &ThemeConfig) -> MarkdownTheme {
         h2: Style::default()
             .fg(cfg.h2_color)
             .add_modifier(Modifier::UNDERLINED),
-        h3: Style::default()
-            .fg(cfg.h3_color)
-            .add_modifier(Modifier::UNDERLINED),
+        h3: Style::default().fg(cfg.h3_color),
         bold: Style::default().add_modifier(bold_mod),
         dim: Style::default().add_modifier(emphasis_mod),
         code: Style::default().fg(cfg.code_color),
@@ -424,39 +422,48 @@ fn render_node(
         }
         NodeValue::Item(_list) => {
             let mut item_text = String::new();
-            let mut checked: Option<bool> = None;
 
             for child in node.children() {
-                let child_data = child.data.borrow();
-                match &child_data.value {
-                    NodeValue::TaskItem(task) => {
-                        checked = Some(task.symbol == Some('x') || task.symbol == Some('X'));
-                    }
-                    _ => {
-                        drop(child_data);
-                        item_text.push_str(&collect_text(&child));
-                    }
-                }
+                item_text.push_str(&collect_text(&child));
             }
 
             let content = item_text.trim();
             if !content.is_empty() {
-                let (prefix, indent_sz) = match checked {
-                    Some(true) => ("  - [x] ".to_string(), 8),
-                    Some(false) => ("  - [ ] ".to_string(), 8),
-                    None => ("  - ".to_string(), 4),
-                };
+                let prefix = "  - ";
                 let first = format!("{}{}", prefix, content);
-                let indent = " ".repeat(indent_sz);
                 let lw = if wrap < 40 { 78 } else { wrap };
                 for (i, seg) in wrap_lines(&first, lw).iter().enumerate() {
                     let s: String = if i == 0 {
                         seg.into()
                     } else {
-                        format!("{}{}", indent, seg)
+                        format!("    {}", seg)
                     };
                     lines.push(Line::from(s));
                 }
+            }
+        }
+        NodeValue::TaskItem(task) => {
+            let checked = task.symbol == Some('x') || task.symbol == Some('X');
+            let mut item_text = String::new();
+
+            for child in node.children() {
+                item_text.push_str(&collect_text(&child));
+            }
+
+            let content = item_text.trim();
+            let check_mark = if checked { "[x]" } else { "[ ]" };
+            let prefix = format!("  {} ", check_mark);
+            let indent_sz = prefix.len();
+            let first = format!("{}{}", prefix, content);
+            let indent = " ".repeat(indent_sz);
+            let lw = if wrap < 40 { 78 } else { wrap };
+            for (i, seg) in wrap_lines(&first, lw).iter().enumerate() {
+                let s: String = if i == 0 {
+                    seg.into()
+                } else {
+                    format!("{}{}", indent, seg)
+                };
+                lines.push(Line::from(s));
             }
         }
         NodeValue::CodeBlock(code_block) => {

@@ -30,6 +30,10 @@ struct Cli {
     /// Theme name to use (overrides default)
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
+
+    /// Wrap width for markdown rendering (default: 80)
+    #[arg(short, long, value_name = "COLS")]
+    width: Option<usize>,
 }
 
 fn main() {
@@ -37,6 +41,7 @@ fn main() {
 
     let cfg = lib::Config::load("gloss", "GLOSS_", cli.config.as_deref());
     let themes = lib::theme::load_themes(cfg.themes_dir.as_deref(), "gloss");
+    let width = cli.width.unwrap_or(cfg.width);
 
     // Select theme
     let theme = if let Some(ref name) = cli.theme {
@@ -54,10 +59,10 @@ fn main() {
     match cli.path {
         // TUI mode: file or directory argument provided, or no arg but tty
         Some(path) if path.is_file() => {
-            tui_preview::run_file_viewer(&path, &cfg, &themes, 0);
+            tui_preview::run_file_viewer(&path, &cfg, &themes, 0, width);
         }
         Some(path) if path.is_dir() => {
-            tui_preview::run_directory_browser(&path, &cfg, &themes);
+            tui_preview::run_directory_browser(&path, &cfg, &themes, width);
         }
         Some(path) => {
             eprintln!("gloss: {}: not a file or directory", path.display());
@@ -70,7 +75,7 @@ fn main() {
         // No arg + tty: browse .md files in cwd
         None => {
             let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            tui_preview::run_directory_browser(&cwd, &cfg, &themes);
+            tui_preview::run_directory_browser(&cwd, &cfg, &themes, width);
         }
     }
 }

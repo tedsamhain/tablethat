@@ -30,7 +30,7 @@ struct App {
 }
 
 impl App {
-    fn new(files: Vec<PathBuf>, themes: Vec<lib::theme::ThemeFile>) -> Self {
+    fn new(files: Vec<PathBuf>, themes: Vec<lib::theme::ThemeFile>, width: usize) -> Self {
         let mut app = Self {
             files,
             selected: 0,
@@ -38,7 +38,7 @@ impl App {
             raw_lines: Vec::new(),
             scroll: 0,
             offset: 0,
-            width: 80,
+            width,
             themes,
             current_theme: 0,
             quit: false,
@@ -193,16 +193,22 @@ pub fn run_file_viewer(
     cfg: &lib::Config,
     themes: &[lib::theme::ThemeFile],
     initial_theme: usize,
+    width: usize,
 ) {
     let files = vec![path.to_path_buf()];
-    let mut app = App::new(files, themes.to_vec());
+    let mut app = App::new(files, themes.to_vec(), width);
     app.current_theme = initial_theme;
     app.load_selected();
     run_tui(&mut app, cfg);
 }
 
 /// Run directory browser TUI
-pub fn run_directory_browser(dir: &Path, cfg: &lib::Config, themes: &[lib::theme::ThemeFile]) {
+pub fn run_directory_browser(
+    dir: &Path,
+    cfg: &lib::Config,
+    themes: &[lib::theme::ThemeFile],
+    width: usize,
+) {
     let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -217,7 +223,7 @@ pub fn run_directory_browser(dir: &Path, cfg: &lib::Config, themes: &[lib::theme
         return;
     }
 
-    let mut app = App::new(files, themes.to_vec());
+    let mut app = App::new(files, themes.to_vec(), width);
     run_tui(&mut app, cfg);
 }
 
@@ -274,39 +280,25 @@ enum Action {
     OpenEditor,
 }
 fn render(frame: &mut Frame, app: &mut App) {
-    let (title_area, body_area, search_area) = if app.search_mode || !app.search_query.is_empty() {
-        let [ta, ba, sa] = Layout::vertical([
-            Constraint::Length(1),
+    let (body_area, search_area, status_area) = if app.search_mode || !app.search_query.is_empty() {
+        let [ba, sa, sta] = Layout::vertical([
             Constraint::Fill(1),
+            Constraint::Length(1),
             Constraint::Length(1),
         ])
         .areas(frame.area());
-        (ta, ba, Some(sa))
+        (ba, Some(sa), sta)
     } else {
-        let [ta, ba] =
-            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
-        (ta, ba, None)
+        let [ba, sta] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(frame.area());
+        (ba, None, sta)
     };
-    let file_name = app
-        .current_file()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .unwrap_or("(no file)");
 
-    let theme_name = app
-        .themes
-        .get(app.current_theme)
-        .map(|t| t.name.as_str())
-        .unwrap_or("default");
-
-    let title = Line::from(Span::styled(
-        format!(
-            " {} [{}] \u{2014} q:quit  c:theme  /:search  e:editor",
-            file_name, theme_name
-        ),
-        Style::default().fg(Color::DarkGray),
-    ));
-    frame.render_widget(title, title_area);
+    app.viewport_height = body_area.height as usize;
+    let max_scroll = app.content.len().saturating_sub(app.viewport_height);
+    if app.scroll > max_scroll {
+        app.scroll = max_scroll;
+    }
 
     frame.render_widget(
         Paragraph::new(app.content.clone()).scroll((app.scroll as u16, app.offset as u16)),
@@ -317,7 +309,6 @@ fn render(frame: &mut Frame, app: &mut App) {
             body_area.height,
         ),
     );
-    app.viewport_height = body_area.height as usize;
 
     if let Some(search_area) = search_area {
         let search_line = if app.search_mode {
@@ -345,6 +336,27 @@ fn render(frame: &mut Frame, app: &mut App) {
         };
         frame.render_widget(search_line, search_area);
     }
+
+    let file_name = app
+        .current_file()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("(no file)");
+
+    let theme_name = app
+        .themes
+        .get(app.current_theme)
+        .map(|t| t.name.as_str())
+        .unwrap_or("default");
+
+    let status = Line::from(Span::styled(
+        format!(
+            " {} [{}] \u{2014} q:quit  c:theme  /:search  e:editor  g/G:top/bottom",
+            file_name, theme_name
+        ),
+        Style::default().fg(Color::DarkGray),
+    ));
+    frame.render_widget(status, status_area);
 }
 
 fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<Action, Box<dyn std::error::Error>> {

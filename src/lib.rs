@@ -19,6 +19,9 @@ pub struct Config {
     pub default_view: String,
     pub default_sort: Vec<String>,
     pub kanban_order: Vec<String>,
+    pub tui_width: usize,
+    pub pager_width: usize,
+    pub width: usize,
     pub colors: ColorsConfig,
 }
 
@@ -77,6 +80,9 @@ impl Default for Config {
                 "blocked".into(),
                 "done".into(),
             ],
+            tui_width: 80,
+            pager_width: 120,
+            width: 80,
             colors: ColorsConfig::default(),
         }
     }

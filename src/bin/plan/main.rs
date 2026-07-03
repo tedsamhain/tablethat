@@ -231,7 +231,7 @@ fn main() {
                     std::process::exit(1);
                 }
             };
-            let ok = tasks::open_task(&path);
+            let ok = tasks::open_task(&path, cfg.pager_width);
             std::process::exit(if ok { 0 } else { 1 });
         }
         Some(Commands::Delete { slug }) => {

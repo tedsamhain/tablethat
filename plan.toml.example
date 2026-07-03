@@ -1,0 +1,35 @@
+# plan configuration — all values shown are defaults
+# Place as plan.toml in project root, or ~/.config/plan/config.toml
+
+# Default view when running `plan` with no subcommand: "list" or "kanban"
+# default_view = "list"
+
+# Editor for `plan open` (falls back to $EDITOR)
+# editor = "vim"
+
+# Sort keys for list view (repeatable)
+# default_sort = ["priority", "slug"]
+
+# Column order for kanban view
+# kanban_order = ["idea", "backlog", "open", "in-progress", "blocked", "done"]
+
+# [theme]
+# h1_color = "cyan"
+# h2_color = "cyan"
+# h3_color = "cyan"
+# code_color = "yellow"
+# bold_style = "bold"
+# emphasis_style = "underlined"
+
+# [colors.status]
+# in_progress = "magenta"
+# open = "yellow"
+# blocked = "red"
+# backlog = "blue"
+# idea = "cyan"
+# done = "green"
+
+# [colors.priority]
+# high = "red"
+# medium = "yellow"
+# low = "darkgray"

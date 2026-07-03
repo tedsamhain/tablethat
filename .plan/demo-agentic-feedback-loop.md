@@ -9,9 +9,8 @@ area: backend
 
 ### Problem
 
-The current AI agent integration is one-directional — agents create tasks in
-.plan/, humans review manually. There's no mechanism for agents to receive
-feedback, update task status based on CI results, or autonomously iterate on work.
+The current AI agent integration is one-directional — agents create tasks in .plan/, humans review manually. There's
+no mechanism for agents to receive feedback, update task status based on CI results, or autonomously iterate on work.
 
 ### Current state
 
@@ -30,18 +29,18 @@ Agent ──creates──► .plan/task.md  ──human edits──►  .plan/ta
 
 ### Loop levels
 
-| Level | Description | Autonomy | Trust required |
-|-------|-------------|----------|---------------|
-| 0 | Agent creates tasks, human reviews manually | None | None |
-| 1 | Agent reads task status, acts on changes | Low | Low |
-| 2 | Agent updates task status, creates follow-ups | Medium | Medium |
-| 3 | Agent opens PRs, reads CI, fixes failures | High | High |
-| 4 | Agent deletes/creates tasks autonomously | Full | Full |
+| Level | Description                                   | Autonomy | Trust required |
+| ----- | --------------------------------------------- | -------- | -------------- |
+| 0     | Agent creates tasks, human reviews manually   | None     | None           |
+| 1     | Agent reads task status, acts on changes      | Low      | Low            |
+| 2     | Agent updates task status, creates follow-ups | Medium   | Medium         |
+| 3     | Agent opens PRs, reads CI, fixes failures     | High     | High           |
+| 4     | Agent deletes/creates tasks autonomously      | Full     | Full           |
 
 ### Level 1: Read feedback (minimal)
 
-Agent reads .plan/ on each invocation. If a human changed status from `open` to
-`blocked` and added a note, the agent sees it next time:
+Agent reads .plan/ on each invocation. If a human changed status from `open` to `blocked` and added a note, the agent
+sees it next time:
 
 ```markdown
 ---
@@ -71,13 +70,11 @@ plan list -s open          # discover work
 plan format .plan/task.md  # clean up
 ```
 
-Needs: agent-friendly CLI commands. Already works — `plan add`, `plan open`,
-`plan format` exist.
+Needs: agent-friendly CLI commands. Already works — `plan add`, `plan open`, `plan format` exist.
 
 ### Level 3: CI integration (high)
 
-Full loop: agent creates task → opens PR → CI runs → agent reads results →
-fixes failures → re-pushes.
+Full loop: agent creates task → opens PR → CI runs → agent reads results → fixes failures → re-pushes.
 
 ```
 Agent ──► plan add fix-auth
@@ -115,31 +112,31 @@ Expose plan operations as MCP tools so agents can call them programmatically:
 }
 ```
 
-The plan CLI already has the right interface for this — each subcommand maps
-to an MCP tool.
+The plan CLI already has the right interface for this — each subcommand maps to an MCP tool.
 
 ### Trust and policy
 
-| Operation | Default policy | Configurable? |
-|-----------|---------------|--------------|
-| `plan list` | Allow | — |
-| `plan add` | Allow | Yes (area restrictions) |
-| `plan open` | Allow | — |
-| `plan format` | Allow | — |
-| `plan delete` | Deny | Yes |
-| Status changes | Allow | Yes (require human approval?) |
+| Operation      | Default policy | Configurable?                 |
+| -------------- | -------------- | ----------------------------- |
+| `plan list`    | Allow          | —                             |
+| `plan add`     | Allow          | Yes (area restrictions)       |
+| `plan open`    | Allow          | —                             |
+| `plan format`  | Allow          | —                             |
+| `plan delete`  | Deny           | Yes                           |
+| Status changes | Allow          | Yes (require human approval?) |
 
 ### Exploration needed
 
 - How do agents discover task changes? Options:
 
   | Method | Latency | Portability | Complexity |
-  |--------|---------|-------------|-----------|
+  | --- | --- | --- | --- |
   | Poll on each invocation | High | High | Low |
   | inotify/fswatch | Low | Linux/macOS | Medium |
   | File hash comparison | Medium | High | Low |
 
-- What's the minimal MCP server? A thin wrapper around the plan CLI binary.
-  Could be 100 lines of Rust using the `rmcp` crate.
-- Should agent-created tasks be marked differently? E.g., `area: agent` or
-  a frontmatter field `created_by: agent` for auditability.
+- What's the minimal MCP server? A thin wrapper around the plan CLI binary. Could be 100 lines of Rust using the `rmcp`
+  crate.
+
+- Should agent-created tasks be marked differently? E.g., `area: agent` or a frontmatter field `created_by: agent` for
+  auditability.

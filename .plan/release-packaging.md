@@ -7,11 +7,11 @@ area: devops
 
 ## Release packaging and crates.io readiness
 
-Purpose: Binary crates must commit Cargo.lock for reproducible builds. Cargo.toml
-is missing metadata needed for crates.io. License file doesn't match declared dual
-license.
+Purpose: Binary crates must commit Cargo.lock for reproducible builds. Cargo.toml is missing metadata needed for
+crates.io. License file doesn't match declared dual license.
 
 Planned fix:
+
 - Remove Cargo.lock from .gitignore, commit it
 - Add `rust-version = "1.85"` to Cargo.toml
 - Add `repository`, `keywords`, `categories`, `readme` to Cargo.toml

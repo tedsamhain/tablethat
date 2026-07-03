@@ -1,4 +1,6 @@
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -185,6 +187,14 @@ impl App {
     fn current_file(&self) -> Option<&Path> {
         self.files.get(self.selected).map(|p| p.as_path())
     }
+
+    fn max_line_width(&self) -> usize {
+        self.content
+            .iter()
+            .map(|line| line.spans.iter().map(|s| s.content.len()).sum::<usize>())
+            .max()
+            .unwrap_or(0)
+    }
 }
 
 /// Run single-file TUI viewer
@@ -235,6 +245,7 @@ fn run_tui(app: &mut App, cfg: &lib::Config) {
             return;
         }
     };
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
 
     while !app.quit {
         if let Err(e) = terminal.draw(|frame| render(frame, app)) {
@@ -272,6 +283,7 @@ fn run_tui(app: &mut App, cfg: &lib::Config) {
         }
     }
 
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
     ratatui::restore();
 }
 
@@ -365,6 +377,15 @@ fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<Action, Box<dyn st
     }
     match event::read()? {
         Event::Resize(_, _) => {}
+        Event::Mouse(MouseEvent { kind, .. }) => match kind {
+            MouseEventKind::ScrollUp => {
+                app.scroll = app.scroll.saturating_sub(3);
+            }
+            MouseEventKind::ScrollDown => {
+                app.scroll = app.scroll.saturating_add(3);
+            }
+            _ => {}
+        },
         Event::Key(key) => {
             if key.kind != KeyEventKind::Press {
                 return Ok(Action::None);
@@ -421,7 +442,8 @@ fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<Action, Box<dyn st
                     app.offset = app.offset.saturating_sub(8);
                 }
                 KeyCode::Right | KeyCode::Char('l') => {
-                    app.offset = app.offset.saturating_add(8);
+                    let max = app.max_line_width().saturating_sub(app.viewport_height);
+                    app.offset = app.offset.saturating_add(8).min(max);
                 }
                 KeyCode::Enter if app.files.len() > 1 => {
                     app.load_selected();

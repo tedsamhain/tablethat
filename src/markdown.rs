@@ -512,6 +512,7 @@ pub fn format_commonmark(text: &str, width: usize) -> String {
     opts.extension.strikethrough = true;
     opts.extension.autolink = true;
     opts.render.width = width;
+    opts.render.prefer_fenced = true;
     comrak::markdown_to_commonmark(text, &opts)
 }
 

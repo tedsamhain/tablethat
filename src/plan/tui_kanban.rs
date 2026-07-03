@@ -796,10 +796,17 @@ impl App<'_> {
                     self.selected_task -= 1;
                 } else if self.selected_column > 0 {
                     self.selected_column -= 1;
-                    self.selected_task = self.columns[self.selected_column]
-                        .task_indices
-                        .len()
-                        .saturating_sub(1);
+                    while self.selected_column > 0
+                        && self.columns[self.selected_column].task_indices.is_empty()
+                    {
+                        self.selected_column -= 1;
+                    }
+                    if !self.columns[self.selected_column].task_indices.is_empty() {
+                        self.selected_task = self.columns[self.selected_column]
+                            .task_indices
+                            .len()
+                            .saturating_sub(1);
+                    }
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
@@ -808,7 +815,14 @@ impl App<'_> {
                     self.selected_task += 1;
                 } else if self.selected_column + 1 < self.columns.len() {
                     self.selected_column += 1;
-                    self.selected_task = 0;
+                    while self.selected_column + 1 < self.columns.len()
+                        && self.columns[self.selected_column].task_indices.is_empty()
+                    {
+                        self.selected_column += 1;
+                    }
+                    if !self.columns[self.selected_column].task_indices.is_empty() {
+                        self.selected_task = 0;
+                    }
                 }
             }
             KeyCode::Left | KeyCode::Char('h') => {

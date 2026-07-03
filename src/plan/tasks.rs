@@ -367,9 +367,9 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 macro_rules! write_colored {
     ($stdout:expr, $color:expr, $($arg:tt)*) => {{
-        $stdout.set_color(ColorSpec::new().set_fg(Some($color))).expect("set_color failed");
-        write!($stdout, $($arg)*).expect("write failed");
-        $stdout.reset().expect("reset failed");
+        let _ = $stdout.set_color(ColorSpec::new().set_fg(Some($color)));
+        let _ = write!($stdout, $($arg)*);
+        let _ = $stdout.reset();
     }};
 }
 
@@ -429,37 +429,36 @@ fn display_kanban(
         let count = group.len();
         let bar = "─".repeat(bar_w);
 
-        writeln!(stdout).expect("write failed");
+        let _ = writeln!(stdout);
         write_colored!(stdout, color, "{} ({})", label, count);
-        writeln!(stdout, " {}", bar).expect("write failed");
+        let _ = writeln!(stdout, " {}", bar);
 
         if group.is_empty() {
             println!(" (none)");
         } else {
             for t in group {
                 let pc = priority_color(&t.task.priority, colors);
-                write!(
+                let _ = write!(
                     stdout,
                     " {:<slug_w$} {:<type_w$} ",
                     t.slug,
                     t.task.task_type,
                     slug_w = slug_w,
                     type_w = type_w
-                )
-                .expect("write failed");
+                );
                 write_colored!(stdout, pc, "{:<prio_w$}", t.task.priority, prio_w = prio_w);
-                writeln!(stdout, " {}", t.task.area).expect("write failed");
+                let _ = writeln!(stdout, " {}", t.task.area);
             }
         }
     }
 
     println!();
-    write!(stdout, "{} tasks:", total).expect("write failed");
+    let _ = write!(stdout, "{} tasks:", total);
     for (status, g) in groups.iter().filter(|(_, g)| !g.is_empty()) {
         let color = status_color(status, colors);
         write_colored!(stdout, color, " {} {}", g.len(), status);
     }
-    writeln!(stdout).expect("write failed");
+    let _ = writeln!(stdout);
 }
 
 fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
@@ -497,7 +496,7 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
         let sc = status_color(&t.task.status, colors);
         let pc = priority_color(&t.task.priority, colors);
 
-        write!(stdout, "{:<slug_w$} ", t.slug, slug_w = slug_w).expect("write failed");
+        let _ = write!(stdout, "{:<slug_w$} ", t.slug, slug_w = slug_w);
         write_colored!(
             stdout,
             sc,
@@ -505,9 +504,9 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
             t.task.status,
             status_w = status_w
         );
-        write!(stdout, " {:<type_w$} ", t.task.task_type, type_w = type_w).expect("write failed");
+        let _ = write!(stdout, " {:<type_w$} ", t.task.task_type, type_w = type_w);
         write_colored!(stdout, pc, "{:<prio_w$}", t.task.priority, prio_w = prio_w);
-        writeln!(stdout, " {}", t.task.area).expect("write failed");
+        let _ = writeln!(stdout, " {}", t.task.area);
     }
 
     let idea_count = tasks.iter().filter(|t| t.task.status == "idea").count();
@@ -520,8 +519,8 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
     let blocked_count = tasks.iter().filter(|t| t.task.status == "blocked").count();
     let done_count = tasks.iter().filter(|t| t.task.status == "done").count();
 
-    writeln!(stdout).expect("write failed");
-    write!(stdout, "{} tasks:", tasks.len()).expect("write failed");
+    let _ = writeln!(stdout);
+    let _ = write!(stdout, "{} tasks:", tasks.len());
     if in_progress_count > 0 {
         write_colored!(
             stdout,
@@ -555,7 +554,7 @@ fn display_table(tasks: &[LoadedTask], colors: &ColorsConfig) {
     if done_count > 0 {
         write_colored!(stdout, status_color("done", colors), " {} done", done_count);
     }
-    writeln!(stdout).expect("write failed");
+    let _ = writeln!(stdout);
 }
 
 pub fn read_task_files(tasks_dir: &std::path::Path) -> Result<Vec<PathBuf>, String> {
@@ -756,34 +755,49 @@ pub fn init_plan(root: &std::path::Path) {
         return;
     }
 
-    std::fs::create_dir_all(&plan_dir).expect("failed to create .plan/");
+    if let Err(e) = std::fs::create_dir_all(&plan_dir) {
+        eprintln!("failed to create .plan/: {e}");
+        return;
+    }
 
     // Copy schema from config/data dir if available
     if let Some(schema_src) =
         lib::resolve_file(root, ".plan", ".schema.json", "schema.json", "plan")
     {
         let dest = plan_dir.join(".schema.json");
-        std::fs::copy(&schema_src, &dest).expect("failed to copy schema");
-        eprintln!("created {}", dest.display());
+        if let Err(e) = std::fs::copy(&schema_src, &dest) {
+            eprintln!("failed to copy schema: {e}");
+        } else {
+            eprintln!("created {}", dest.display());
+        }
     } else {
         // Write default schema
         let schema = include_str!("../../.plan/.schema.json");
         let dest = plan_dir.join(".schema.json");
-        std::fs::write(&dest, schema).expect("failed to write schema");
-        eprintln!("created {}", dest.display());
+        if let Err(e) = std::fs::write(&dest, schema) {
+            eprintln!("failed to write schema: {e}");
+        } else {
+            eprintln!("created {}", dest.display());
+        }
     }
 
     // Copy template from config/data dir if available
     if let Some(tmpl_src) = lib::resolve_file(root, ".plan", ".TEMPLATE.md", "TEMPLATE.md", "plan")
     {
         let dest = plan_dir.join(".TEMPLATE.md");
-        std::fs::copy(&tmpl_src, &dest).expect("failed to copy template");
-        eprintln!("created {}", dest.display());
+        if let Err(e) = std::fs::copy(&tmpl_src, &dest) {
+            eprintln!("failed to copy template: {e}");
+        } else {
+            eprintln!("created {}", dest.display());
+        }
     } else {
         let tmpl = include_str!("../../.plan/.TEMPLATE.md");
         let dest = plan_dir.join(".TEMPLATE.md");
-        std::fs::write(&dest, tmpl).expect("failed to write template");
-        eprintln!("created {}", dest.display());
+        if let Err(e) = std::fs::write(&dest, tmpl) {
+            eprintln!("failed to write template: {e}");
+        } else {
+            eprintln!("created {}", dest.display());
+        }
     }
 
     eprintln!("initialized .plan/ in {}", root.display());
@@ -819,14 +833,18 @@ pub fn create_task(
 }
 
 pub fn open_task(path: &std::path::Path, width: usize) -> bool {
-    let status = std::process::Command::new("gloss")
+    match std::process::Command::new("gloss")
         .arg("--width")
         .arg(width.to_string())
         .arg(path)
         .status()
-        .expect("failed to launch gloss");
-
-    status.success()
+    {
+        Ok(status) => status.success(),
+        Err(e) => {
+            eprintln!("failed to launch gloss: {e}");
+            false
+        }
+    }
 }
 
 pub fn delete_task(path: &std::path::Path) -> bool {

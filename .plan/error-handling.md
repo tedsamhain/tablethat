@@ -1,5 +1,5 @@
 ---
-status: open
+status: done
 type: bug
 priority: high
 area: backend

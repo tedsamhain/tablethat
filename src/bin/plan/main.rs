@@ -231,8 +231,7 @@ fn main() {
                     std::process::exit(1);
                 }
             };
-            let editor = cfg.editor.as_deref();
-            let ok = tasks::open_task(&path, editor);
+            let ok = tasks::open_task(&path);
             std::process::exit(if ok { 0 } else { 1 });
         }
         Some(Commands::Delete { slug }) => {

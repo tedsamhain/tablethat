@@ -833,14 +833,11 @@ pub fn create_task(
     true
 }
 
-pub fn open_task(path: &std::path::Path, editor: Option<&str>) -> bool {
-    let env_editor = std::env::var("EDITOR").ok();
-    let editor = editor.or(env_editor.as_deref()).unwrap_or("vi");
-
-    let status = std::process::Command::new(editor)
+pub fn open_task(path: &std::path::Path) -> bool {
+    let status = std::process::Command::new("gloss")
         .arg(path)
         .status()
-        .expect("failed to launch editor");
+        .expect("failed to launch gloss");
 
     status.success()
 }

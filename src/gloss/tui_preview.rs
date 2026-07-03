@@ -2,7 +2,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -13,12 +13,20 @@ struct App {
     files: Vec<PathBuf>,
     selected: usize,
     content: Vec<Line<'static>>,
+    raw_lines: Vec<String>,
     scroll: usize,
     offset: usize,
     width: usize,
     themes: Vec<lib::theme::ThemeFile>,
     current_theme: usize,
     quit: bool,
+    search_mode: bool,
+    search_query: String,
+    search_hits: Vec<usize>,
+    search_index: usize,
+    highlight_style: Style,
+    highlight_current_style: Style,
+    viewport_height: usize,
 }
 
 impl App {
@@ -27,12 +35,26 @@ impl App {
             files,
             selected: 0,
             content: Vec::new(),
+            raw_lines: Vec::new(),
             scroll: 0,
             offset: 0,
             width: 80,
             themes,
             current_theme: 0,
             quit: false,
+            search_mode: false,
+            search_query: String::new(),
+            search_hits: Vec::new(),
+            search_index: 0,
+            highlight_style: Style::default()
+                .fg(Color::Black)
+                .bg(Color::Gray)
+                .add_modifier(Modifier::BOLD),
+            highlight_current_style: Style::default()
+                .fg(Color::Black)
+                .bg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            viewport_height: 1,
         };
         app.load_selected();
         app
@@ -42,6 +64,7 @@ impl App {
         if let Some(path) = self.files.get(self.selected)
             && let Ok(text) = std::fs::read_to_string(path)
         {
+            self.raw_lines = text.lines().map(|l| l.to_string()).collect();
             let theme_cfg = self
                 .themes
                 .get(self.current_theme)
@@ -55,6 +78,107 @@ impl App {
             self.content = lib::markdown::render_markdown(&th, &text, self.width);
             self.scroll = 0;
             self.offset = 0;
+            self.search_hits.clear();
+            self.search_index = 0;
+        }
+    }
+
+    fn highlight_matches(&self, lines: &[Line<'static>]) -> Vec<Line<'static>> {
+        if self.search_query.is_empty() {
+            return lines.to_vec();
+        }
+        let q = self.search_query.to_lowercase();
+        let mut global_match = 0usize;
+        lines
+            .iter()
+            .map(|line| {
+                let mut new_spans: Vec<Span<'static>> = Vec::new();
+                for span in &line.spans {
+                    let text: &str = &span.content;
+                    let lower = text.to_lowercase();
+                    let style = span.style;
+                    let mut last = 0;
+                    for (idx, _) in lower.match_indices(&q) {
+                        if idx > last {
+                            new_spans.push(Span::styled(text[last..idx].to_string(), style));
+                        }
+                        let hl = if global_match == self.search_index {
+                            self.highlight_current_style
+                        } else {
+                            self.highlight_style
+                        };
+                        new_spans.push(Span::styled(text[idx..idx + q.len()].to_string(), hl));
+                        global_match += 1;
+                        last = idx + q.len();
+                    }
+                    if last < text.len() {
+                        new_spans.push(Span::styled(text[last..].to_string(), style));
+                    }
+                }
+                Line::from(new_spans)
+            })
+            .collect()
+    }
+
+    fn apply_search_highlight(&mut self) {
+        let theme_cfg = self
+            .themes
+            .get(self.current_theme)
+            .map(|t| &t.theme)
+            .unwrap_or_else(|| {
+                static DEFAULT: std::sync::OnceLock<lib::ThemeConfig> = std::sync::OnceLock::new();
+                DEFAULT.get_or_init(lib::ThemeConfig::default)
+            });
+        let th = lib::markdown::theme_from_cfg(theme_cfg);
+        if let Some(path) = self.files.get(self.selected)
+            && let Ok(text) = std::fs::read_to_string(path)
+        {
+            let base = lib::markdown::render_markdown(&th, &text, self.width);
+            self.content = self.highlight_matches(&base);
+        }
+    }
+
+    fn run_search(&mut self) {
+        self.search_hits.clear();
+        self.search_index = 0;
+        let q = self.search_query.to_lowercase();
+        if q.is_empty() {
+            return;
+        }
+        for (i, line) in self.content.iter().enumerate() {
+            let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+            let lower = text.to_lowercase();
+            for _ in lower.match_indices(&q) {
+                self.search_hits.push(i);
+            }
+        }
+        if !self.search_hits.is_empty() {
+            self.scroll_to_match(0);
+            self.apply_search_highlight();
+        }
+    }
+
+    fn search_next(&mut self) {
+        if self.search_hits.is_empty() {
+            return;
+        }
+        self.search_index = (self.search_index + 1) % self.search_hits.len();
+        self.scroll_to_match(self.search_index);
+        self.apply_search_highlight();
+    }
+
+    fn search_prev(&mut self) {
+        if self.search_hits.is_empty() {
+            return;
+        }
+        self.search_index = self.search_index.wrapping_sub(1) % self.search_hits.len();
+        self.scroll_to_match(self.search_index);
+        self.apply_search_highlight();
+    }
+
+    fn scroll_to_match(&mut self, index: usize) {
+        if let Some(&line) = self.search_hits.get(index) {
+            self.scroll = line.saturating_sub(6);
         }
     }
 
@@ -115,19 +239,54 @@ fn run_tui(app: &mut App, cfg: &lib::Config) {
                 break;
             }
         }
-        if let Err(e) = handle_events(app, cfg) {
-            eprintln!("event error: {e}");
-            break;
+        match handle_events(app, cfg) {
+            Ok(Action::OpenEditor) => {
+                if let Some(path) = app.current_file().map(|p| p.to_path_buf()) {
+                    let editor = std::env::var("EDITOR")
+                        .ok()
+                        .filter(|e| !e.is_empty())
+                        .unwrap_or_else(|| "sensible-editor".to_string());
+                    ratatui::restore();
+                    let _ = std::process::Command::new(&editor).arg(&path).status();
+                    app.load_selected();
+                    terminal = match ratatui::try_init() {
+                        Ok(t) => t,
+                        Err(e) => {
+                            eprintln!("failed to reinit terminal: {e}");
+                            break;
+                        }
+                    };
+                }
+            }
+            Ok(Action::None) => {}
+            Err(e) => {
+                eprintln!("event error: {e}");
+                break;
+            }
         }
     }
 
     ratatui::restore();
 }
 
-fn render(frame: &mut Frame, app: &App) {
-    let [title_area, body_area] =
-        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
-
+enum Action {
+    None,
+    OpenEditor,
+}
+fn render(frame: &mut Frame, app: &mut App) {
+    let (title_area, body_area, search_area) = if app.search_mode || !app.search_query.is_empty() {
+        let [ta, ba, sa] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Fill(1),
+            Constraint::Length(1),
+        ])
+        .areas(frame.area());
+        (ta, ba, Some(sa))
+    } else {
+        let [ta, ba] =
+            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(frame.area());
+        (ta, ba, None)
+    };
     let file_name = app
         .current_file()
         .and_then(|p| p.file_name())
@@ -142,17 +301,12 @@ fn render(frame: &mut Frame, app: &App) {
 
     let title = Line::from(Span::styled(
         format!(
-            " {} [{}] \u{2014} q:quit  c:theme  \u{2191}\u{2193}\u{2190}\u{2192}:pan",
+            " {} [{}] \u{2014} q:quit  c:theme  /:search  e:editor",
             file_name, theme_name
         ),
         Style::default().fg(Color::DarkGray),
     ));
     frame.render_widget(title, title_area);
-
-    let tw = ((body_area.width.saturating_sub(1) as f64 * 0.9) as u16).clamp(40, 120) as usize;
-    if tw != app.width {
-        // Width changed — would need to re-render, but we skip for simplicity in v1
-    }
 
     frame.render_widget(
         Paragraph::new(app.content.clone()).scroll((app.scroll as u16, app.offset as u16)),
@@ -163,18 +317,73 @@ fn render(frame: &mut Frame, app: &App) {
             body_area.height,
         ),
     );
+    app.viewport_height = body_area.height as usize;
+
+    if let Some(search_area) = search_area {
+        let search_line = if app.search_mode {
+            Line::from(Span::styled(
+                format!("/{}", app.search_query),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ))
+        } else if app.search_hits.is_empty() {
+            Line::from(Span::styled(
+                format!("/{} (no matches)", app.search_query),
+                Style::default().fg(Color::DarkGray),
+            ))
+        } else {
+            Line::from(Span::styled(
+                format!(
+                    "/{} ({}/{})",
+                    app.search_query,
+                    app.search_index + 1,
+                    app.search_hits.len()
+                ),
+                Style::default().fg(Color::DarkGray),
+            ))
+        };
+        frame.render_widget(search_line, search_area);
+    }
 }
 
-fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<Action, Box<dyn std::error::Error>> {
     if !event::poll(std::time::Duration::from_millis(100))? {
-        return Ok(());
+        return Ok(Action::None);
     }
     match event::read()? {
         Event::Resize(_, _) => {}
         Event::Key(key) => {
             if key.kind != KeyEventKind::Press {
-                return Ok(());
+                return Ok(Action::None);
             }
+
+            // Search mode input
+            if app.search_mode {
+                match key.code {
+                    KeyCode::Esc => {
+                        app.search_mode = false;
+                        app.search_query.clear();
+                        app.search_hits.clear();
+                        app.search_index = 0;
+                        app.load_selected();
+                    }
+                    KeyCode::Enter => {
+                        app.search_mode = false;
+                        app.run_search();
+                    }
+                    KeyCode::Backspace => {
+                        app.search_query.pop();
+                    }
+                    KeyCode::Char(ch) => {
+                        app.search_query.push(ch);
+                    }
+                    _ => {}
+                }
+                return Ok(Action::None);
+            }
+
+            // Normal mode
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => app.quit = true,
                 KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => app.quit = true,
@@ -193,7 +402,7 @@ fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<(), Box<dyn std::e
                 KeyCode::PageUp => {
                     app.scroll = app.scroll.saturating_sub(20);
                 }
-                KeyCode::PageDown => {
+                KeyCode::PageDown | KeyCode::Char(' ') => {
                     app.scroll = app.scroll.saturating_add(20);
                 }
                 KeyCode::Left | KeyCode::Char('h') => {
@@ -205,10 +414,29 @@ fn handle_events(app: &mut App, _cfg: &lib::Config) -> Result<(), Box<dyn std::e
                 KeyCode::Enter if app.files.len() > 1 => {
                     app.load_selected();
                 }
+                KeyCode::Char('e') => {
+                    return Ok(Action::OpenEditor);
+                }
+                KeyCode::Char('/') => {
+                    app.search_mode = true;
+                    app.search_query.clear();
+                }
+                KeyCode::Char('n') => {
+                    app.search_next();
+                }
+                KeyCode::Char('N') => {
+                    app.search_prev();
+                }
+                KeyCode::Char('g') => {
+                    app.scroll = 0;
+                }
+                KeyCode::Char('G') => {
+                    app.scroll = app.content.len().saturating_sub(app.viewport_height);
+                }
                 _ => {}
             }
         }
         _ => {}
     }
-    Ok(())
+    Ok(Action::None)
 }

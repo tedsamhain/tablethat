@@ -81,7 +81,7 @@ impl Default for Config {
                 "done".into(),
             ],
             tui_width: 80,
-            pager_width: 120,
+            pager_width: 100,
             width: 80,
             colors: ColorsConfig::default(),
         }
